@@ -60,8 +60,9 @@
     .action-btn { padding: 6px 12px; border: 1px solid #ddd; border-radius: 6px; font-size: 12px; background: white; cursor: pointer; }
     .action-btn:hover { background: #f8f8f8; }
     
-    .add-btn { position: fixed; right: 20px; bottom: 90px; width: 56px; height: 56px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 50%; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 12px rgba(102,126,234,0.4); cursor: pointer; z-index: 99; }
-    .add-btn span { color: white; font-size: 32px; line-height: 1; }
+    .add-btn { position: fixed; right: 20px; bottom: 90px; width: 56px; height: 56px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 50%; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 12px rgba(102,126,234,0.4); cursor: pointer; z-index: 99; user-select: none; touch-action: none; transition: transform 0.1s, box-shadow 0.1s; }
+    .add-btn.dragging { transform: scale(1.1); box-shadow: 0 6px 16px rgba(102,126,234,0.6); }
+    .add-btn span { color: white; font-size: 32px; line-height: 1; pointer-events: none; }
     
     /* 详情页样式 */
     .detail-header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 16px 24px; display: flex; align-items: center; }
@@ -167,7 +168,7 @@
   </div>
   
   <!-- 设置按钮 -->
-  <div class="add-btn" onclick="event.stopPropagation(); toggleHomeMenu()">
+  <div class="add-btn" id="home-add-btn">
     <span>⚙️</span>
   </div>
   
@@ -462,6 +463,65 @@ function toggleHomeMenu() {
   menu.style.display = menu.style.display === 'none' ? 'block' : 'none';
 }
 
+let dragState = { isDragging: false, startX: 0, startY: 0, startLeft: 0, startTop: 0, moveDistance: 0 };
+
+function initDraggableButton() {
+  const btn = document.getElementById('home-add-btn');
+  if (!btn) return;
+  
+  btn.addEventListener('mousedown', startDrag);
+  document.addEventListener('mousemove', onDrag);
+  document.addEventListener('mouseup', endDrag);
+  
+  btn.addEventListener('touchstart', startDrag, { passive: false });
+  document.addEventListener('touchmove', onDrag, { passive: false });
+  document.addEventListener('touchend', endDrag);
+}
+
+function startDrag(e) {
+  e.preventDefault();
+  const btn = document.getElementById('home-add-btn');
+  const touch = e.touches ? e.touches[0] : e;
+  const rect = btn.getBoundingClientRect();
+  
+  dragState = { isDragging: true, startX: touch.clientX, startY: touch.clientY, startLeft: rect.left, startTop: rect.top, moveDistance: 0 };
+  
+  btn.classList.add('dragging');
+  btn.style.right = 'auto';
+  btn.style.bottom = 'auto';
+}
+
+function onDrag(e) {
+  if (!dragState.isDragging) return;
+  e.preventDefault();
+  
+  const btn = document.getElementById('home-add-btn');
+  const touch = e.touches ? e.touches[0] : e;
+  const dx = touch.clientX - dragState.startX;
+  const dy = touch.clientY - dragState.startY;
+  
+  dragState.moveDistance = Math.sqrt(dx * dx + dy * dy);
+  
+  let newLeft = Math.max(10, Math.min(dragState.startLeft + dx, window.innerWidth - 66));
+  let newTop = Math.max(10, Math.min(dragState.startTop + dy, window.innerHeight - 136));
+  
+  btn.style.left = newLeft + 'px';
+  btn.style.top = newTop + 'px';
+}
+
+function endDrag(e) {
+  if (!dragState.isDragging) return;
+  
+  const btn = document.getElementById('home-add-btn');
+  btn.classList.remove('dragging');
+  
+  if (dragState.moveDistance < 5) {
+    toggleHomeMenu();
+  }
+  
+  dragState.isDragging = false;
+}
+
 function calculateTotalProfit() {
   const vehicles = getVehicles();
   let rentalProfit = 0;
@@ -753,6 +813,7 @@ function initYearSelector() {
   document.getElementById('year-selector').innerHTML = years.map(y => `<option value="${y}" ${y === currentYear ? 'selected' : ''}>${y}年</option>`).join('');
   renderProfitChart();
   renderYearProfitChart(currentYear);
+  initDraggableButton();
 }
 
 function changeYear() {
