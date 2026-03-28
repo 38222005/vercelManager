@@ -145,13 +145,25 @@
     <p style="color:rgba(255,255,255,0.8);font-size:14px;margin-top:4px;" id="current-date"></p>
   </div>
   
-  <!-- 利润统计卡片 -->
+  <!-- 总利润饼图卡片 -->
   <div class="card">
-    <div style="font-size:16px;font-weight:bold;margin-bottom:16px;">利润分析</div>
+    <div style="font-size:16px;font-weight:bold;margin-bottom:16px;">总利润分析</div>
     <div style="display:flex;align-items:center;justify-content:center;">
       <canvas id="profitChart" style="max-width:260px;max-height:260px;"></canvas>
     </div>
     <div id="profit-summary" style="margin-top:16px;padding-top:16px;border-top:1px solid #f0f0f0;"></div>
+  </div>
+  
+  <!-- 年度利润柱状图卡片 -->
+  <div class="card">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+      <div style="font-size:16px;font-weight:bold;">年度利润分析</div>
+      <select id="year-selector" onchange="changeYear()" style="padding:6px 12px;border:1px solid #ddd;border-radius:6px;font-size:14px;background:white;"></select>
+    </div>
+    <div style="margin-top:16px;">
+      <canvas id="monthlyProfitChart"></canvas>
+    </div>
+    <div id="year-profit-summary" style="margin-top:16px;padding-top:16px;border-top:1px solid #f0f0f0;"></div>
   </div>
   
   <!-- 设置按钮 -->
@@ -412,14 +424,14 @@ function renderTabBar(modules) {
   ).join('');
   
   updateDate();
-  renderProfitChart();
+  initYearSelector();
 }
 
 function switchTab(key, el) {
   document.querySelectorAll('.tab-item').forEach(t => t.classList.remove('active'));
   el.classList.add('active');
   showPage(key);
-  if (key === 'home') renderProfitChart();
+  if (key === 'home') initYearSelector();
   if (key === 'rental') initRentalPage();
   if (key === 'newvehicle') initNewVehiclePage();
   if (key === 'maintenance') initMaintenancePage();
@@ -450,8 +462,6 @@ function toggleHomeMenu() {
   menu.style.display = menu.style.display === 'none' ? 'block' : 'none';
 }
 
-let profitChart = null;
-
 function calculateTotalProfit() {
   const vehicles = getVehicles();
   let rentalProfit = 0;
@@ -481,6 +491,8 @@ function calculateTotalProfit() {
     total: rentalProfit + newVehicleProfit + maintenanceProfit + otherNetIncome
   };
 }
+
+let profitChart = null;
 
 function renderProfitChart() {
   const profits = calculateTotalProfit();
@@ -551,6 +563,200 @@ function renderProfitChart() {
       <span>¥${profits.total.toFixed(2)}</span>
     </div>
   `;
+}
+
+let monthlyChart = null;
+
+function getAvailableYears() {
+  const years = new Set();
+  const currentYear = new Date().getFullYear();
+  years.add(currentYear);
+  
+  getVehicles().forEach(v => {
+    if (v.sellDate) years.add(new Date(v.sellDate).getFullYear());
+    (v.rentals || []).forEach(r => {
+      if (r.startDate) years.add(new Date(r.startDate).getFullYear());
+    });
+  });
+  
+  getNewVehicles().forEach(v => {
+    if (v.sellDate) years.add(new Date(v.sellDate).getFullYear());
+  });
+  
+  getMaintenanceRecords().forEach(r => {
+    if (r.repairDate) years.add(new Date(r.repairDate).getFullYear());
+  });
+  
+  getOtherRecords().forEach(r => {
+    if (r.billDate) years.add(new Date(r.billDate).getFullYear());
+  });
+  
+  return Array.from(years).sort((a, b) => b - a);
+}
+
+function calculateYearProfit(year) {
+  let rentalProfit = 0, newVehicleProfit = 0, maintenanceProfit = 0, otherNetIncome = 0;
+  
+  getVehicles().forEach(v => {
+    (v.rentals || []).forEach(r => {
+      if (r.startDate && new Date(r.startDate).getFullYear() === year) {
+        rentalProfit += parseFloat(r.rent || 0);
+      }
+    });
+    if (v.isSold === '是' && v.sellDate && new Date(v.sellDate).getFullYear() === year) {
+      rentalProfit += parseFloat(v.sellPrice || 0) - parseFloat(v.purchasePrice || 0);
+      if (v.costs) v.costs.forEach(c => rentalProfit -= parseFloat(c.amount || 0));
+    }
+    (v.otherProfits || []).forEach(o => {
+      if (o.date && new Date(o.date).getFullYear() === year) {
+        rentalProfit += parseFloat(o.amount || 0);
+      }
+    });
+  });
+  
+  getNewVehicles().forEach(v => {
+    if (v.sellDate && new Date(v.sellDate).getFullYear() === year) {
+      newVehicleProfit += calculateNewVehicleProfit(v);
+    }
+  });
+  
+  getMaintenanceRecords().forEach(r => {
+    if (r.repairDate && new Date(r.repairDate).getFullYear() === year) {
+      maintenanceProfit += calculateMaintenanceProfit(r);
+    }
+  });
+  
+  getOtherRecords().forEach(r => {
+    if (r.billDate && new Date(r.billDate).getFullYear() === year) {
+      (r.incomes || []).forEach(i => otherNetIncome += parseFloat(i.amount || 0));
+      (r.expenses || []).forEach(e => otherNetIncome -= parseFloat(e.amount || 0));
+    }
+  });
+  
+  return { rentalProfit, newVehicleProfit, maintenanceProfit, otherNetIncome, total: rentalProfit + newVehicleProfit + maintenanceProfit + otherNetIncome };
+}
+
+function calculateMonthlyProfit(year) {
+  const months = [];
+  for (let m = 0; m < 12; m++) {
+    let rentalProfit = 0, newVehicleProfit = 0, maintenanceProfit = 0, otherNetIncome = 0;
+    
+    getVehicles().forEach(v => {
+      (v.rentals || []).forEach(r => {
+        const d = new Date(r.startDate);
+        if (d.getFullYear() === year && d.getMonth() === m) {
+          rentalProfit += parseFloat(r.rent || 0);
+        }
+      });
+      if (v.isSold === '是' && v.sellDate) {
+        const d = new Date(v.sellDate);
+        if (d.getFullYear() === year && d.getMonth() === m) {
+          rentalProfit += parseFloat(v.sellPrice || 0) - parseFloat(v.purchasePrice || 0);
+          if (v.costs) v.costs.forEach(c => rentalProfit -= parseFloat(c.amount || 0));
+        }
+      }
+      (v.otherProfits || []).forEach(o => {
+        const d = new Date(o.date);
+        if (d.getFullYear() === year && d.getMonth() === m) {
+          rentalProfit += parseFloat(o.amount || 0);
+        }
+      });
+    });
+    
+    getNewVehicles().forEach(v => {
+      if (v.sellDate) {
+        const d = new Date(v.sellDate);
+        if (d.getFullYear() === year && d.getMonth() === m) {
+          newVehicleProfit += calculateNewVehicleProfit(v);
+        }
+      }
+    });
+    
+    getMaintenanceRecords().forEach(r => {
+      if (r.repairDate) {
+        const d = new Date(r.repairDate);
+        if (d.getFullYear() === year && d.getMonth() === m) {
+          maintenanceProfit += calculateMaintenanceProfit(r);
+        }
+      }
+    });
+    
+    getOtherRecords().forEach(r => {
+      if (r.billDate) {
+        const d = new Date(r.billDate);
+        if (d.getFullYear() === year && d.getMonth() === m) {
+          (r.incomes || []).forEach(i => otherNetIncome += parseFloat(i.amount || 0));
+          (r.expenses || []).forEach(e => otherNetIncome -= parseFloat(e.amount || 0));
+        }
+      }
+    });
+    
+    months.push({ month: m + 1, rentalProfit, newVehicleProfit, maintenanceProfit, otherNetIncome });
+  }
+  return months;
+}
+
+function renderYearProfitChart(year) {
+  const yearProfit = calculateYearProfit(year);
+  const monthlyData = calculateMonthlyProfit(year);
+  
+  const allProfits = monthlyData.flatMap(m => [m.rentalProfit, m.newVehicleProfit, m.maintenanceProfit, m.otherNetIncome]);
+  const maxProfit = Math.max(...allProfits, 0);
+  const yMax = Math.ceil(maxProfit * 1.1 / 10) * 10 || 100;
+  const stepSize = Math.ceil(yMax / 10 / 10) * 10 || 10;
+  
+  const ctx = document.getElementById('monthlyProfitChart');
+  if (!ctx) return;
+  
+  if (monthlyChart) monthlyChart.destroy();
+  
+  monthlyChart = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: ['1月','2月','3月','4月','5月','6月','7月','8月','9月','10月','11月','12月'],
+      datasets: [
+        { label: '租赁利润', data: monthlyData.map(m => m.rentalProfit), backgroundColor: '#667eea' },
+        { label: '新车利润', data: monthlyData.map(m => m.newVehicleProfit), backgroundColor: '#4CAF50' },
+        { label: '维修利润', data: monthlyData.map(m => m.maintenanceProfit), backgroundColor: '#FF9800' },
+        { label: '其他收入', data: monthlyData.map(m => m.otherNetIncome), backgroundColor: '#9C27B0' }
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: true,
+      scales: {
+        y: {
+          beginAtZero: true,
+          max: yMax,
+          ticks: { stepSize: stepSize, callback: v => '¥' + v }
+        }
+      },
+      plugins: {
+        legend: { position: 'bottom', labels: { padding: 12, usePointStyle: true } },
+        tooltip: { callbacks: { label: ctx => ctx.dataset.label + ': ¥' + ctx.raw.toFixed(2) } }
+      }
+    }
+  });
+  
+  document.getElementById('year-profit-summary').innerHTML = `
+    <div style="display:flex;justify-content:space-between;margin-bottom:8px;"><span style="color:#667eea;">● 租赁利润</span><span>¥${yearProfit.rentalProfit.toFixed(2)}</span></div>
+    <div style="display:flex;justify-content:space-between;margin-bottom:8px;"><span style="color:#4CAF50;">● 新车利润</span><span>¥${yearProfit.newVehicleProfit.toFixed(2)}</span></div>
+    <div style="display:flex;justify-content:space-between;margin-bottom:8px;"><span style="color:#FF9800;">● 维修利润</span><span>¥${yearProfit.maintenanceProfit.toFixed(2)}</span></div>
+    <div style="display:flex;justify-content:space-between;margin-bottom:8px;"><span style="color:#9C27B0;">● 其他净收入</span><span>¥${yearProfit.otherNetIncome.toFixed(2)}</span></div>
+    <div style="display:flex;justify-content:space-between;padding-top:8px;border-top:2px solid #f0f0f0;font-weight:bold;font-size:16px;"><span>本年总利润</span><span>¥${yearProfit.total.toFixed(2)}</span></div>
+  `;
+}
+
+function initYearSelector() {
+  const years = getAvailableYears();
+  const currentYear = new Date().getFullYear();
+  document.getElementById('year-selector').innerHTML = years.map(y => `<option value="${y}" ${y === currentYear ? 'selected' : ''}>${y}年</option>`).join('');
+  renderProfitChart();
+  renderYearProfitChart(currentYear);
+}
+
+function changeYear() {
+  renderYearProfitChart(parseInt(document.getElementById('year-selector').value));
 }
 
 document.addEventListener('click', function(e) {
