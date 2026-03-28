@@ -682,6 +682,8 @@ function startDrag(e) {
   dragState = { isDragging: true, startX: touch.clientX, startY: touch.clientY, startLeft: rect.left, startTop: rect.top, moveDistance: 0 };
   
   btn.classList.add('dragging');
+  btn.style.left = rect.left + 'px';
+  btn.style.top = rect.top + 'px';
   btn.style.right = 'auto';
   btn.style.bottom = 'auto';
 }
@@ -1228,7 +1230,6 @@ function initYearSelector() {
   renderDayProfitChart(today);
   renderMonthProfitChart(currentMonth);
   renderYearProfitChart(currentYear);
-  initDraggableButton();
 }
 
 function changeYear() {
@@ -2787,6 +2788,7 @@ function deleteOtherRecord(id) {
   else if (!m || !m.length) showPage('modules');
   else { showPage('home'); renderTabBar(m); }
   renderModules();
+  initDraggableButton();
 })();
 </script>
 </body>
