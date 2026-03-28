@@ -1,0 +1,981 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>电动车管家</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #F8F8F8; }
+    .page { display: none; min-height: 100vh; padding-bottom: 70px; }
+    .page.active { display: block; }
+    .tab-bar { position: fixed; bottom: 0; left: 0; right: 0; background: #fff; box-shadow: 0 -2px 10px rgba(0,0,0,0.1); z-index: 100; display: none; }
+    .tab-bar.show { display: block; }
+    .tab-item { flex: 1; text-align: center; padding: 8px 0; cursor: pointer; }
+    .tab-item.active { color: #007AFF; }
+    .tab-icon { font-size: 24px; }
+    .tab-text { font-size: 12px; margin-top: 4px; }
+    .gradient-bg { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }
+    .card { background: white; border-radius: 16px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); padding: 20px; margin: 16px; }
+    .input-field { width: 100%; padding: 16px; border: 2px solid #e5e5e5; border-radius: 12px; font-size: 16px; outline: none; }
+    .input-field:focus { border-color: #007AFF; }
+    .btn-primary { width: 100%; padding: 16px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border: none; border-radius: 12px; font-size: 18px; font-weight: bold; cursor: pointer; }
+    .module-item { padding: 20px; border-radius: 16px; margin-bottom: 12px; border: 2px solid #e5e5e5; cursor: pointer; transition: all 0.3s; }
+    .module-item.selected { border-color: #007AFF; background: rgba(0,122,255,0.05); }
+    .checkbox { width: 24px; height: 24px; border: 3px solid #ccc; border-radius: 50%; display: flex; align-items: center; justify-content: center; }
+    .checkbox.checked { background: #007AFF; border-color: #007AFF; color: white; }
+    .toast { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: rgba(0,0,0,0.8); color: white; padding: 16px 32px; border-radius: 8px; z-index: 1000; }
+    
+    /* 租赁页面专用样式 */
+    .rental-header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 16px 24px; display: flex; justify-content: space-between; align-items: center; }
+    .rental-stats { display: flex; gap: 12px; flex-wrap: wrap; }
+    .rental-stat-item { background: rgba(255,255,255,0.2); padding: 6px 12px; border-radius: 8px; color: white; font-size: 12px; }
+    
+    .finance-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; padding: 16px; }
+    .finance-item { background: white; border-radius: 12px; padding: 16px; text-align: center; box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
+    .finance-label { font-size: 12px; color: #999; margin-bottom: 8px; }
+    .finance-value { font-size: 18px; font-weight: bold; color: #333; }
+    
+    .reminder-box { background: #FFF3CD; margin: 0 16px 16px; padding: 12px 16px; border-radius: 12px; border-left: 4px solid #FFC107; }
+    .reminder-title { font-size: 14px; font-weight: bold; color: #856404; margin-bottom: 8px; }
+    .reminder-item { font-size: 12px; color: #856404; margin: 4px 0; }
+    
+    .filter-bar { display: flex; gap: 12px; padding: 0 16px 16px; align-items: center; flex-wrap: wrap; }
+    .filter-select { padding: 8px 12px; border: 1px solid #ddd; border-radius: 8px; font-size: 14px; background: white; min-width: 100px; }
+    .filter-input { padding: 8px 12px; border: 1px solid #ddd; border-radius: 8px; font-size: 14px; flex: 1; min-width: 120px; }
+    .filter-btn { padding: 8px 20px; background: #007AFF; color: white; border: none; border-radius: 8px; font-size: 14px; cursor: pointer; }
+    
+    .vehicle-card { background: white; border-radius: 12px; padding: 16px; margin: 0 16px 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); position: relative; }
+    .vehicle-card.idle { border-left: 4px solid #FFA500; }
+    .vehicle-card.rented { border-left: 4px solid #4CAF50; }
+    .vehicle-card.sold { background: #f5f5f5; opacity: 0.7; border-left: 4px solid #999; }
+    .vehicle-name { font-size: 16px; font-weight: bold; color: #333; margin-bottom: 8px; }
+    .vehicle-info { font-size: 12px; color: #666; margin: 4px 0; }
+    .vehicle-status { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: bold; }
+    .status-idle { background: #FFF3CD; color: #856404; }
+    .status-rented { background: #D4EDDA; color: #155724; }
+    .status-sold { background: #E2E3E5; color: #383d41; }
+    .vehicle-actions { display: flex; gap: 8px; margin-top: 12px; }
+    .action-btn { padding: 6px 12px; border: 1px solid #ddd; border-radius: 6px; font-size: 12px; background: white; cursor: pointer; }
+    .action-btn:hover { background: #f8f8f8; }
+    
+    .add-btn { position: fixed; right: 20px; bottom: 90px; width: 56px; height: 56px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 50%; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 12px rgba(102,126,234,0.4); cursor: pointer; z-index: 99; }
+    .add-btn span { color: white; font-size: 32px; line-height: 1; }
+    
+    /* 详情页样式 */
+    .detail-header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 16px 24px; display: flex; align-items: center; }
+    .back-btn { color: white; font-size: 24px; margin-right: 16px; cursor: pointer; }
+    .detail-section { background: white; margin: 16px; padding: 16px; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
+    .section-title { font-size: 16px; font-weight: bold; color: #333; margin-bottom: 12px; display: flex; justify-content: space-between; align-items: center; }
+    .form-row { margin-bottom: 12px; }
+    .form-label { font-size: 14px; color: #666; margin-bottom: 4px; display: block; }
+    .form-input { width: 100%; padding: 10px 12px; border: 1px solid #ddd; border-radius: 8px; font-size: 14px; }
+    .form-select { width: 100%; padding: 10px 12px; border: 1px solid #ddd; border-radius: 8px; font-size: 14px; background: white; }
+    
+    .sub-table { width: 100%; border-collapse: collapse; margin-top: 8px; }
+    .sub-table th, .sub-table td { padding: 8px; border: 1px solid #eee; text-align: left; font-size: 12px; }
+    .sub-table th { background: #f8f8f8; font-weight: bold; }
+    .sub-table td input { width: 100%; padding: 4px 8px; border: 1px solid #ddd; border-radius: 4px; font-size: 12px; }
+    .delete-row { color: #dc3545; cursor: pointer; font-size: 16px; }
+    .add-row-btn { margin-top: 8px; padding: 6px 12px; background: #28a745; color: white; border: none; border-radius: 6px; font-size: 12px; cursor: pointer; }
+    
+    .profit-analysis { background: #f8f8f8; padding: 12px; border-radius: 8px; margin-top: 12px; }
+    .profit-row { display: flex; justify-content: space-between; margin: 4px 0; font-size: 12px; }
+    .profit-row.total { font-weight: bold; font-size: 14px; border-top: 1px solid #ddd; padding-top: 8px; margin-top: 8px; }
+    
+    .btn-group { display: flex; gap: 12px; padding: 16px; }
+    .btn-save { flex: 1; padding: 12px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border: none; border-radius: 8px; font-size: 16px; cursor: pointer; }
+    .btn-cancel { flex: 1; padding: 12px; background: #f8f8f8; color: #666; border: 1px solid #ddd; border-radius: 8px; font-size: 16px; cursor: pointer; }
+    
+    .required-star { color: #dc3545; }
+    .hint-text { font-size: 11px; color: #dc3545; margin-top: 4px; }
+  </style>
+</head>
+<body>
+
+<!-- 激活页面 -->
+<div id="page-activation" class="page active">
+  <div class="gradient-bg" style="min-height:100vh;display:flex;align-items:center;justify-content:center;padding:16px;">
+    <div style="width:100%;max-width:400px;">
+      <div style="text-align:center;margin-bottom:32px;">
+        <div style="font-size:80px;margin-bottom:16px;">🛵</div>
+        <h1 style="font-size:32px;font-weight:bold;color:white;margin-bottom:8px;">电动车管家</h1>
+        <p style="color:rgba(255,255,255,0.8);">您的电动车贴心助手</p>
+      </div>
+      <div class="card">
+        <input type="text" id="activation-code" class="input-field" style="margin-bottom:16px;" placeholder="请输入激活码" maxlength="20">
+        <button class="btn-primary" onclick="handleActivate()">立即激活</button>
+        <div style="margin-top:24px;padding-top:24px;border-top:1px solid #e5e5e5;">
+          <p style="font-size:14px;color:#666;margin-bottom:8px;font-weight:bold;">温馨提示</p>
+          <p style="font-size:12px;color:#999;">• 临时激活码: 13255405952 (24小时)</p>
+          <p style="font-size:12px;color:#999;">• 永久激活码: 15965867361</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 模块选择页面 -->
+<div id="page-modules" class="page">
+  <div class="gradient-bg" style="padding:24px;">
+    <h1 style="font-size:24px;font-weight:bold;color:white;">选择功能模块</h1>
+    <p style="color:rgba(255,255,255,0.8);font-size:14px;">至少选择一个模块</p>
+  </div>
+  <div style="padding:16px;">
+    <div id="modules-list"></div>
+    <button class="btn-primary" style="margin-top:16px;" onclick="confirmModules()">确认选择</button>
+  </div>
+</div>
+
+<!-- 首页 -->
+<div id="page-home" class="page">
+  <div class="gradient-bg" style="padding:24px;">
+    <h1 style="font-size:20px;font-weight:bold;color:white;">欢迎使用电动车管家</h1>
+    <p style="color:rgba(255,255,255,0.8);font-size:14px;margin-top:4px;" id="current-date"></p>
+  </div>
+  
+  <div style="padding:16px;">
+    <div class="card" style="padding:0;">
+      <div style="padding:16px;border-bottom:1px solid #f0f0f0;cursor:pointer;" onclick="showActivationInfo()">
+        <span style="font-size:24px;margin-right:12px;">🔑</span><span>激活信息</span>
+      </div>
+      <div style="padding:16px;border-bottom:1px solid #f0f0f0;cursor:pointer;" onclick="gotoModules()">
+        <span style="font-size:24px;margin-right:12px;">⚙️</span><span>模块管理</span>
+      </div>
+      <div style="padding:16px;cursor:pointer;" onclick="showAbout()">
+        <span style="font-size:24px;margin-right:12px;">📱</span><span>关于我们</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 二手页面 -->
+<div id="page-rental" class="page">
+  <div class="rental-header">
+    <h1 style="font-size:20px;font-weight:bold;color:white;">二手</h1>
+    <div class="rental-stats" id="rental-stats"></div>
+  </div>
+  
+  <!-- 财务模块 -->
+  <div class="finance-grid" id="finance-grid"></div>
+  
+  <!-- 提醒区域 -->
+  <div class="reminder-box" id="reminder-box" style="display:none;"></div>
+  
+  <!-- 筛选功能 -->
+  <div class="filter-bar">
+    <select class="filter-select" id="filter-status">
+      <option value="">全部状态</option>
+      <option value="idle">闲置</option>
+      <option value="rented">租出</option>
+      <option value="sold">出售</option>
+    </select>
+    <input type="text" class="filter-input" id="filter-name" placeholder="车辆名称（模糊搜索）">
+    <button class="filter-btn" onclick="filterVehicles()">筛选</button>
+  </div>
+  
+  <!-- 车辆列表 -->
+  <div id="vehicle-list"></div>
+  
+  <!-- 新增按钮 -->
+  <div class="add-btn" onclick="showVehicleDetail()">
+    <span>+</span>
+  </div>
+</div>
+
+<!-- 车辆详情页面 -->
+<div id="page-vehicle-detail" class="page">
+  <div class="detail-header">
+    <div class="back-btn" onclick="showPage('rental'); initRentalPage();">←</div>
+    <h1 style="font-size:18px;font-weight:bold;color:white;" id="detail-title">电动车详情</h1>
+  </div>
+  
+  <div id="detail-content"></div>
+</div>
+
+<!-- 维修页面 -->
+<div id="page-maintenance" class="page">
+  <div class="gradient-bg" style="padding:24px;"><h1 style="font-size:24px;font-weight:bold;color:white;">维修服务</h1></div>
+  <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding:80px 16px;">
+    <div style="font-size:60px;margin-bottom:16px;opacity:0.5;">🔧</div>
+    <p style="color:#999;">功能开发中，敬请期待</p>
+  </div>
+</div>
+
+<!-- 新车页面 -->
+<div id="page-newvehicle" class="page">
+  <div class="gradient-bg" style="padding:24px;"><h1 style="font-size:24px;font-weight:bold;color:white;">新车选购</h1></div>
+  <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding:80px 16px;">
+    <div style="font-size:60px;margin-bottom:16px;opacity:0.5;">🚗</div>
+    <p style="color:#999;">功能开发中，敬请期待</p>
+  </div>
+</div>
+
+<!-- 其他页面 -->
+<div id="page-other" class="page">
+  <div class="gradient-bg" style="padding:24px;"><h1 style="font-size:24px;font-weight:bold;color:white;">其他</h1></div>
+  <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding:80px 16px;">
+    <div style="font-size:60px;margin-bottom:16px;opacity:0.5;">⋯</div>
+    <p style="color:#999;">暂无更多功能</p>
+  </div>
+</div>
+
+<!-- 底部 TabBar -->
+<div id="tab-bar" class="tab-bar">
+  <div style="display:flex;"></div>
+</div>
+
+<script>
+const STORAGE = {
+  get: k => { try { return JSON.parse(localStorage.getItem(k)); } catch { return null; } },
+  set: (k, v) => localStorage.setItem(k, JSON.stringify(v)),
+  remove: k => localStorage.removeItem(k)
+};
+
+const CODES = { TEMPORARY: '13255405952', PERMANENT: '15965867361' };
+const MODULES = [
+  { key: 'rental', name: '二手', desc: '二手车买卖管理', icon: '📋' },
+  { key: 'maintenance', name: '维修服务', desc: '预约维修保养', icon: '🔧' },
+  { key: 'newvehicle', name: '新车选购', desc: '新车浏览购买', icon: '🚗' }
+];
+
+function showToast(msg) {
+  const t = document.createElement('div');
+  t.className = 'toast';
+  t.textContent = msg;
+  document.body.appendChild(t);
+  setTimeout(() => t.remove(), 2000);
+}
+
+function showPage(name) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.getElementById('page-' + name).classList.add('active');
+  document.getElementById('tab-bar').classList.toggle('show', ['home','rental','maintenance','newvehicle','other'].includes(name));
+}
+
+function renderModules() {
+  const selected = STORAGE.get('modules') || [];
+  document.getElementById('modules-list').innerHTML = MODULES.map(m => `
+    <div class="module-item card ${selected.includes(m.key) ? 'selected' : ''}" onclick="toggleModule('${m.key}')">
+      <div style="display:flex;align-items:center;">
+        <div style="font-size:36px;margin-right:16px;">${m.icon}</div>
+        <div style="flex:1;">
+          <div style="font-weight:bold;">${m.name}</div>
+          <div style="font-size:12px;color:#999;">${m.desc}</div>
+        </div>
+        <div class="checkbox ${selected.includes(m.key) ? 'checked' : ''}">${selected.includes(m.key) ? '✓' : ''}</div>
+      </div>
+    </div>
+  `).join('');
+}
+
+function toggleModule(key) {
+  let selected = STORAGE.get('modules') || [];
+  const idx = selected.indexOf(key);
+  if (idx > -1) selected.splice(idx, 1);
+  else selected.push(key);
+  STORAGE.set('modules', selected);
+  renderModules();
+}
+
+function handleActivate() {
+  const code = document.getElementById('activation-code').value.trim();
+  if (!code) return showToast('请输入激活码');
+  
+  const usedCodes = STORAGE.get('usedCodes') || [];
+  
+  if (code === CODES.TEMPORARY) {
+    if (usedCodes.includes(code)) return showToast('该激活码已使用过');
+    STORAGE.set('activation', { type: 'temporary', expireTime: Date.now() + 86400000 });
+    STORAGE.set('usedCodes', [...usedCodes, code]);
+    showToast('激活成功，有效期24小时');
+    setTimeout(() => showPage('modules'), 1000);
+  } else if (code === CODES.PERMANENT) {
+    STORAGE.set('activation', { type: 'permanent' });
+    showToast('永久激活成功');
+    setTimeout(() => showPage('modules'), 1000);
+  } else {
+    showToast('激活码错误');
+  }
+}
+
+function confirmModules() {
+  const selected = STORAGE.get('modules') || [];
+  if (selected.length === 0) return showToast('至少选择一个模块');
+  showToast('设置成功');
+  showPage('home');
+  renderTabBar(selected);
+}
+
+function renderTabBar(modules) {
+  const tabs = [{ key: 'home', name: '首页', icon: '🏠' }];
+  modules.forEach(m => {
+    const mod = MODULES.find(x => x.key === m);
+    if (mod) tabs.push({ key: mod.key, name: mod.name.slice(0,2), icon: mod.icon });
+  });
+  tabs.push({ key: 'other', name: '其他', icon: '⋯' });
+  
+  document.querySelector('#tab-bar > div').innerHTML = tabs.map((t, i) => 
+    `<div class="tab-item ${i === 0 ? 'active' : ''}" onclick="switchTab('${t.key}',this)">
+      <div class="tab-icon">${t.icon}</div><div class="tab-text">${t.name}</div>
+    </div>`
+  ).join('');
+  
+  updateDate();
+}
+
+function switchTab(key, el) {
+  document.querySelectorAll('.tab-item').forEach(t => t.classList.remove('active'));
+  el.classList.add('active');
+  showPage(key);
+  // 切换到租赁页面时初始化
+  if (key === 'rental') {
+    initRentalPage();
+  }
+}
+
+function updateDate() {
+  const now = new Date();
+  const weekDays = ['日','一','二','三','四','五','六'];
+  document.getElementById('current-date').textContent = `${now.getFullYear()}年${String(now.getMonth()+1).padStart(2,'0')}月${String(now.getDate()).padStart(2,'0')}日 星期${weekDays[now.getDay()]}`;
+}
+
+function showActivationInfo() {
+  const a = STORAGE.get('activation');
+  let msg = !a ? '未激活' : a.type === 'permanent' ? '您已永久激活' : 
+    (a.expireTime > Date.now() ? `临时激活，剩余：${Math.floor((a.expireTime-Date.now())/3600000)}小时` : '激活已过期');
+  alert('激活信息\n\n' + msg);
+}
+
+function gotoModules() { showPage('modules'); }
+
+function showAbout() {
+  alert('关于我们\n\n电动车管家 v1.0.0\n\n您的电动车贴心助手');
+}
+
+// ========== 租赁管理模块 ==========
+const VEHICLE_STORAGE_KEY = 'evb_vehicles';
+
+// 获取所有车辆
+function getVehicles() {
+  return STORAGE.get(VEHICLE_STORAGE_KEY) || [];
+}
+
+// 保存所有车辆
+function saveVehicles(vehicles) {
+  STORAGE.set(VEHICLE_STORAGE_KEY, vehicles);
+}
+
+// 初始化租赁页面
+function initRentalPage() {
+  updateStats();
+  updateFinance();
+  checkReminders();
+  renderVehicleList();
+}
+
+// 更新统计信息
+function updateStats() {
+  const vehicles = getVehicles();
+  const stats = {
+    total: vehicles.length,
+    idle: 0,
+    rented: 0,
+    sold: 0
+  };
+  
+  vehicles.forEach(v => {
+    if (v.isSold === '是') {
+      stats.sold++;
+    } else {
+      const hasActiveRental = v.rentals && v.rentals.some(r => new Date(r.endDate) >= new Date());
+      if (hasActiveRental) {
+        stats.rented++;
+      } else {
+        stats.idle++;
+      }
+    }
+  });
+  
+  document.getElementById('rental-stats').innerHTML = `
+    <div class="rental-stat-item">总数: ${stats.total}</div>
+    <div class="rental-stat-item">闲置: ${stats.idle}</div>
+    <div class="rental-stat-item">租出: ${stats.rented}</div>
+    <div class="rental-stat-item">出售: ${stats.sold}</div>
+  `;
+}
+
+// 计算单车利润
+function calculateVehicleProfit(vehicle) {
+  let profit = 0;
+  
+  // 租赁利润
+  if (vehicle.rentals) {
+    vehicle.rentals.forEach(r => profit += parseFloat(r.rent || 0));
+  }
+  
+  // 其他利润
+  if (vehicle.otherProfits) {
+    vehicle.otherProfits.forEach(o => profit += parseFloat(o.amount || 0));
+  }
+  
+  // 如果已出售
+  if (vehicle.isSold === '是') {
+    profit += parseFloat(vehicle.sellPrice || 0) - parseFloat(vehicle.purchasePrice || 0);
+    if (vehicle.costs) {
+      vehicle.costs.forEach(c => profit -= parseFloat(c.amount || 0));
+    }
+  }
+  
+  return profit;
+}
+
+// 更新财务模块
+function updateFinance() {
+  const vehicles = getVehicles();
+  const now = new Date();
+  
+  // 总利润 = 所有车子的利润之和
+  let totalProfit = 0;
+  vehicles.forEach(v => totalProfit += calculateVehicleProfit(v));
+  
+  // 年利润计算
+  // 未出售：当年租金 + 当年其他利润
+  // 已出售：当年租金 + 当年其他利润 + 当年出售金额 - 收购金额 - 成本金额
+  let yearProfit = 0;
+  vehicles.forEach(v => {
+    // 租赁利润（按起始日期）
+    if (v.rentals) {
+      v.rentals.forEach(r => {
+        const startDate = new Date(r.startDate);
+        if (startDate.getFullYear() === now.getFullYear()) {
+          yearProfit += parseFloat(r.rent || 0);
+        }
+      });
+    }
+    // 其他利润（按日期）
+    if (v.otherProfits) {
+      v.otherProfits.forEach(o => {
+        const opDate = new Date(o.date || o.createTime);
+        if (opDate.getFullYear() === now.getFullYear()) {
+          yearProfit += parseFloat(o.amount || 0);
+        }
+      });
+    }
+    // 已出售车辆的特殊计算
+    if (v.isSold === '是' && v.sellDate) {
+      const sellDate = new Date(v.sellDate);
+      if (sellDate.getFullYear() === now.getFullYear()) {
+        yearProfit += parseFloat(v.sellPrice || 0);
+        yearProfit -= parseFloat(v.purchasePrice || 0);
+        if (v.costs) {
+          v.costs.forEach(c => yearProfit -= parseFloat(c.amount || 0));
+        }
+      }
+    }
+  });
+  
+  // 月利润计算
+  // 未出售：当月租金 + 当月其他利润
+  // 已出售：当月租金 + 当月其他利润 + 当月出售金额 - 收购金额 - 成本金额
+  let monthProfit = 0;
+  vehicles.forEach(v => {
+    // 租赁利润（按起始日期）
+    if (v.rentals) {
+      v.rentals.forEach(r => {
+        const startDate = new Date(r.startDate);
+        if (startDate.getFullYear() === now.getFullYear() && startDate.getMonth() === now.getMonth()) {
+          monthProfit += parseFloat(r.rent || 0);
+        }
+      });
+    }
+    // 其他利润（按日期）
+    if (v.otherProfits) {
+      v.otherProfits.forEach(o => {
+        const opDate = new Date(o.date || o.createTime);
+        if (opDate.getFullYear() === now.getFullYear() && opDate.getMonth() === now.getMonth()) {
+          monthProfit += parseFloat(o.amount || 0);
+        }
+      });
+    }
+    // 已出售车辆的特殊计算
+    if (v.isSold === '是' && v.sellDate) {
+      const sellDate = new Date(v.sellDate);
+      if (sellDate.getFullYear() === now.getFullYear() && sellDate.getMonth() === now.getMonth()) {
+        monthProfit += parseFloat(v.sellPrice || 0);
+        monthProfit -= parseFloat(v.purchasePrice || 0);
+        if (v.costs) {
+          v.costs.forEach(c => monthProfit -= parseFloat(c.amount || 0));
+        }
+      }
+    }
+  });
+  
+  // 总成本 = 所有车子收购价格 + 分录中成本信息业务金额
+  let totalCost = 0;
+  vehicles.forEach(v => {
+    totalCost += parseFloat(v.purchasePrice || 0);
+    if (v.costs) {
+      v.costs.forEach(c => totalCost += parseFloat(c.amount || 0));
+    }
+  });
+  
+  // 回归成本 = 出售的车子收购价格之和 + 分录中业务金额之和
+  let returnCost = 0;
+  vehicles.filter(v => v.isSold === '是').forEach(v => {
+    returnCost += parseFloat(v.purchasePrice || 0);
+    if (v.costs) {
+      v.costs.forEach(c => returnCost += parseFloat(c.amount || 0));
+    }
+  });
+  
+  // 押金 = 所有租赁记录的押金之和
+  let totalDeposit = 0;
+  vehicles.forEach(v => {
+    if (v.rentals) {
+      v.rentals.forEach(r => totalDeposit += parseFloat(r.deposit || 0));
+    }
+  });
+  
+  document.getElementById('finance-grid').innerHTML = `
+    <div class="finance-item">
+      <div class="finance-label">总利润</div>
+      <div class="finance-value">¥${totalProfit.toFixed(2)}</div>
+    </div>
+    <div class="finance-item">
+      <div class="finance-label">年利润</div>
+      <div class="finance-value">¥${yearProfit.toFixed(2)}</div>
+    </div>
+    <div class="finance-item">
+      <div class="finance-label">月利润</div>
+      <div class="finance-value">¥${monthProfit.toFixed(2)}</div>
+    </div>
+    <div class="finance-item">
+      <div class="finance-label">总成本</div>
+      <div class="finance-value">¥${totalCost.toFixed(2)}</div>
+    </div>
+    <div class="finance-item">
+      <div class="finance-label">回归成本</div>
+      <div class="finance-value">¥${returnCost.toFixed(2)}</div>
+    </div>
+    <div class="finance-item">
+      <div class="finance-label">总押金</div>
+      <div class="finance-value">¥${totalDeposit.toFixed(2)}</div>
+    </div>
+  `;
+}
+
+// 检查即将到期的租赁
+function checkReminders() {
+  const vehicles = getVehicles();
+  const today = new Date();
+  const twoDaysLater = new Date(today.getTime() + 2 * 24 * 60 * 60 * 1000);
+  
+  const reminders = [];
+  vehicles.forEach(v => {
+    if (v.rentals) {
+      v.rentals.forEach(r => {
+        const endDate = new Date(r.endDate);
+        if (endDate <= twoDaysLater && endDate >= today && v.isSold !== '是') {
+          reminders.push({
+            vehicleName: v.name,
+            endDate: r.endDate
+          });
+        }
+      });
+    }
+  });
+  
+  const reminderBox = document.getElementById('reminder-box');
+  if (reminders.length > 0) {
+    reminderBox.style.display = 'block';
+    reminderBox.innerHTML = `
+      <div class="reminder-title">⚠️ 到期提醒</div>
+      ${reminders.map(r => `<div class="reminder-item">${r.vehicleName} 将于 ${r.endDate} 到期</div>`).join('')}
+    `;
+  } else {
+    reminderBox.style.display = 'none';
+  }
+}
+
+// 筛选车辆
+function filterVehicles() {
+  renderVehicleList();
+}
+
+// 渲染车辆列表
+function renderVehicleList() {
+  const vehicles = getVehicles();
+  const filterStatus = document.getElementById('filter-status').value;
+  const filterName = document.getElementById('filter-name').value.trim().toLowerCase();
+  
+  // 筛选
+  let filtered = vehicles;
+  
+  // 状态筛选
+  if (filterStatus) {
+    filtered = filtered.filter(v => {
+      if (filterStatus === 'sold') return v.isSold === '是';
+      if (filterStatus === 'idle') return v.isSold !== '是' && !hasActiveRental(v);
+      if (filterStatus === 'rented') return v.isSold !== '是' && hasActiveRental(v);
+      return true;
+    });
+  }
+  
+  // 名称筛选
+  if (filterName) {
+    filtered = filtered.filter(v => v.name.toLowerCase().includes(filterName));
+  }
+  
+  // 排序：闲置 > 租出 > 出售
+  filtered.sort((a, b) => {
+    const statusA = getVehicleStatus(a);
+    const statusB = getVehicleStatus(b);
+    const order = { 'idle': 1, 'rented': 2, 'sold': 3 };
+    return order[statusA] - order[statusB];
+  });
+  
+  const listHtml = filtered.map(v => {
+    const status = getVehicleStatus(v);
+    const profit = calculateVehicleProfit(v);
+    let endDateText = '';
+    
+    if (status === 'rented' && v.rentals) {
+      const activeRental = v.rentals.find(r => new Date(r.endDate) >= new Date());
+      if (activeRental) {
+        endDateText = ` (截止: ${activeRental.endDate})`;
+      }
+    }
+    
+    const statusClass = status === 'idle' ? 'status-idle' : status === 'rented' ? 'status-rented' : 'status-sold';
+    const statusText = status === 'idle' ? '闲置' : status === 'rented' ? '租出' : '出售';
+    
+    return `
+      <div class="vehicle-card ${status}">
+        <div class="vehicle-name">${v.name}</div>
+        <div class="vehicle-info">电池: ${v.batterySize || '48v12ah'}</div>
+        <div class="vehicle-info">利润: ¥${profit.toFixed(2)}</div>
+        <div class="vehicle-info">
+          状态: <span class="vehicle-status ${statusClass}">${statusText}${endDateText}</span>
+        </div>
+        <div class="vehicle-actions">
+          <button class="action-btn" onclick="showVehicleDetail('${v.id}', 'view')">查看</button>
+          <button class="action-btn" onclick="showVehicleDetail('${v.id}', 'edit')">编辑</button>
+          <button class="action-btn" onclick="deleteVehicle('${v.id}')">删除</button>
+        </div>
+      </div>
+    `;
+  }).join('');
+  
+  document.getElementById('vehicle-list').innerHTML = listHtml || '<div style="text-align:center;padding:40px;color:#999;">暂无车辆数据</div>';
+}
+
+// 判断车辆是否有活跃的租赁
+function hasActiveRental(vehicle) {
+  if (!vehicle.rentals || vehicle.rentals.length === 0) return false;
+  return vehicle.rentals.some(r => new Date(r.endDate) >= new Date());
+}
+
+// 获取车辆状态
+function getVehicleStatus(vehicle) {
+  if (vehicle.isSold === '是') return 'sold';
+  if (hasActiveRental(vehicle)) return 'rented';
+  return 'idle';
+}
+
+// 显示车辆详情
+function showVehicleDetail(id, mode) {
+  const vehicles = getVehicles();
+  const vehicle = id ? vehicles.find(v => v.id === id) : null;
+  const isNew = !id;
+  const isView = mode === 'view';
+  
+  document.getElementById('detail-title').textContent = isNew ? '新增电动车' : (isView ? '车辆详情' : '编辑车辆');
+  
+  const profit = vehicle ? calculateVehicleProfit(vehicle) : 0;
+  
+  let html = `
+    <div class="detail-section">
+      <div class="section-title">基本信息</div>
+      <div class="form-row">
+        <label class="form-label">电动车名称 <span class="required-star">*</span></label>
+        <input type="text" class="form-input" id="vehicle-name" value="${vehicle ? vehicle.name : ''}" ${isView ? 'disabled' : ''} placeholder="请输入名称">
+      </div>
+      <div class="form-row">
+        <label class="form-label">收购价格 <span class="required-star">*</span></label>
+        <input type="number" class="form-input" id="vehicle-purchase-price" value="${vehicle ? vehicle.purchasePrice : ''}" ${isView ? 'disabled' : ''} placeholder="请输入收购价格">
+      </div>
+      <div class="form-row">
+        <label class="form-label">是否出售 <span class="required-star">*</span></label>
+        <select class="form-select" id="vehicle-is-sold" ${isView ? 'disabled' : ''}>
+          <option value="否" ${!vehicle || vehicle.isSold === '否' ? 'selected' : ''}>否</option>
+          <option value="是" ${vehicle && vehicle.isSold === '是' ? 'selected' : ''}>是</option>
+        </select>
+      </div>
+      <div class="form-row sell-info-row" style="display:${vehicle && vehicle.isSold === '是' ? 'block' : 'none'}">
+        <label class="form-label">出售价格 <span class="required-star">*</span></label>
+        <input type="number" class="form-input" id="vehicle-sell-price" value="${vehicle && vehicle.sellPrice ? vehicle.sellPrice : ''}" ${isView ? 'disabled' : ''} placeholder="请输入出售价格">
+      </div>
+      <div class="form-row sell-info-row" style="display:${vehicle && vehicle.isSold === '是' ? 'block' : 'none'}">
+        <label class="form-label">出售日期 <span class="required-star">*</span></label>
+        <input type="date" class="form-input" id="vehicle-sell-date" value="${vehicle && vehicle.sellDate ? vehicle.sellDate : new Date().toISOString().split('T')[0]}" ${isView ? 'disabled' : ''}>
+      </div>
+      <div class="form-row">
+        <label class="form-label">电池大小 <span class="required-star">*</span></label>
+        <input type="text" class="form-input" id="vehicle-battery-size" value="${vehicle ? vehicle.batterySize : '48v12ah'}" ${isView ? 'disabled' : ''} placeholder="例如: 48v12ah">
+      </div>
+      <div class="form-row">
+        <label class="form-label">备注</label>
+        <textarea class="form-input" id="vehicle-remark" ${isView ? 'disabled' : ''} rows="3" placeholder="请输入备注">${vehicle ? vehicle.remark : ''}</textarea>
+      </div>
+    </div>
+    
+    ${vehicle && isView ? `
+    <div class="detail-section">
+      <div class="section-title">利润分析</div>
+      <div class="profit-analysis">
+        <div class="profit-row"><span>总收入:</span><span>¥${profit.toFixed(2)}</span></div>
+      </div>
+    </div>
+    ` : ''}
+    
+    <div class="detail-section">
+      <div class="section-title">成本信息 ${!isView ? '<button class="add-row-btn" onclick="addCostRow()">+ 添加</button>' : ''}</div>
+      <table class="sub-table">
+        <thead>
+          <tr><th>业务名称 <span class="required-star">*</span></th><th>业务金额 <span class="required-star">*</span></th><th>备注</th>${!isView ? '<th></th>' : ''}</tr>
+        </thead>
+        <tbody id="costs-tbody">
+          ${vehicle && vehicle.costs ? vehicle.costs.map((c, i) => renderCostRow(c, i, isView)).join('') : ''}
+        </tbody>
+      </table>
+    </div>
+    
+    <div class="detail-section">
+      <div class="section-title">租赁利润 ${!isView ? '<button class="add-row-btn" onclick="addRentalRow()">+ 添加</button>' : ''}</div>
+      <table class="sub-table">
+        <thead>
+          <tr><th>开始日期 <span class="required-star">*</span></th><th>截止日期 <span class="required-star">*</span></th><th>租金 <span class="required-star">*</span></th><th>押金</th><th>备注</th>${!isView ? '<th></th>' : ''}</tr>
+        </thead>
+        <tbody id="rentals-tbody">
+          ${vehicle && vehicle.rentals ? vehicle.rentals.map((r, i) => renderRentalRow(r, i, isView)).join('') : ''}
+        </tbody>
+      </table>
+    </div>
+    
+    <div class="detail-section">
+      <div class="section-title">其他利润 <span class="hint-text">（卖车利润无需填写）</span> ${!isView ? '<button class="add-row-btn" onclick="addOtherProfitRow()">+ 添加</button>' : ''}</div>
+      <table class="sub-table">
+        <thead>
+          <tr><th>日期 <span class="required-star">*</span></th><th>业务名称 <span class="required-star">*</span></th><th>业务金额 <span class="required-star">*</span></th><th>备注</th>${!isView ? '<th></th>' : ''}</tr>
+        </thead>
+        <tbody id="other-profits-tbody">
+          ${vehicle && vehicle.otherProfits ? vehicle.otherProfits.map((o, i) => renderOtherProfitRow(o, i, isView)).join('') : ''}
+        </tbody>
+      </table>
+    </div>
+    
+    ${!isView ? `
+    <div class="btn-group">
+      <button class="btn-save" onclick="saveVehicle('${id || ''}')">保存</button>
+      <button class="btn-cancel" onclick="showPage('rental'); initRentalPage();">取消</button>
+    </div>
+    ` : ''}
+  `;
+  
+  document.getElementById('detail-content').innerHTML = html;
+  
+  // 添加是否出售的change事件
+  if (!isView) {
+    document.getElementById('vehicle-is-sold').addEventListener('change', function() {
+      const display = this.value === '是' ? 'block' : 'none';
+      document.querySelectorAll('.sell-info-row').forEach(row => row.style.display = display);
+    });
+  }
+  
+  showPage('vehicle-detail');
+}
+
+// 渲染成本行
+function renderCostRow(cost, index, isView) {
+  return `
+    <tr>
+      <td><input type="text" value="${cost.businessName || ''}" data-field="businessName" data-index="${index}" ${isView ? 'disabled' : ''}></td>
+      <td><input type="number" value="${cost.amount || ''}" data-field="amount" data-index="${index}" ${isView ? 'disabled' : ''}></td>
+      <td><input type="text" value="${cost.remark || ''}" data-field="remark" data-index="${index}" ${isView ? 'disabled' : ''}></td>
+      ${!isView ? `<td><span class="delete-row" onclick="this.parentElement.parentElement.remove()">×</span></td>` : ''}
+    </tr>
+  `;
+}
+
+// 渲染租赁行
+function renderRentalRow(rental, index, isView) {
+  return `
+    <tr>
+      <td><input type="date" value="${rental.startDate || ''}" data-field="startDate" data-index="${index}" ${isView ? 'disabled' : ''}></td>
+      <td><input type="date" value="${rental.endDate || ''}" data-field="endDate" data-index="${index}" ${isView ? 'disabled' : ''}></td>
+      <td><input type="number" value="${rental.rent || ''}" data-field="rent" data-index="${index}" ${isView ? 'disabled' : ''}></td>
+      <td><input type="number" value="${rental.deposit || ''}" data-field="deposit" data-index="${index}" ${isView ? 'disabled' : ''}></td>
+      <td><input type="text" value="${rental.remark || ''}" data-field="remark" data-index="${index}" ${isView ? 'disabled' : ''}></td>
+      ${!isView ? `<td><span class="delete-row" onclick="this.parentElement.parentElement.remove()">×</span></td>` : ''}
+    </tr>
+  `;
+}
+
+// 渲染其他利润行
+function renderOtherProfitRow(otherProfit, index, isView) {
+  const today = new Date().toISOString().split('T')[0];
+  const defaultDate = otherProfit.date || today;
+  return `
+    <tr>
+      <td><input type="date" value="${defaultDate}" data-field="date" data-index="${index}" ${isView ? 'disabled' : ''}></td>
+      <td><input type="text" value="${otherProfit.businessName || ''}" data-field="businessName" data-index="${index}" ${isView ? 'disabled' : ''}></td>
+      <td><input type="number" value="${otherProfit.amount || ''}" data-field="amount" data-index="${index}" ${isView ? 'disabled' : ''}></td>
+      <td><input type="text" value="${otherProfit.remark || ''}" data-field="remark" data-index="${index}" ${isView ? 'disabled' : ''}></td>
+      ${!isView ? `<td><span class="delete-row" onclick="this.parentElement.parentElement.remove()">×</span></td>` : ''}
+    </tr>
+  `;
+}
+
+// 添加成本行
+function addCostRow() {
+  const tbody = document.getElementById('costs-tbody');
+  const index = tbody.children.length;
+  tbody.insertAdjacentHTML('beforeend', renderCostRow({}, index, false));
+}
+
+// 添加租赁行
+function addRentalRow() {
+  const tbody = document.getElementById('rentals-tbody');
+  const index = tbody.children.length;
+  tbody.insertAdjacentHTML('beforeend', renderRentalRow({}, index, false));
+}
+
+// 添加其他利润行
+function addOtherProfitRow() {
+  const tbody = document.getElementById('other-profits-tbody');
+  const index = tbody.children.length;
+  tbody.insertAdjacentHTML('beforeend', renderOtherProfitRow({}, index, false));
+}
+
+// 保存车辆
+function saveVehicle(id) {
+  const name = document.getElementById('vehicle-name').value.trim();
+  const purchasePrice = document.getElementById('vehicle-purchase-price').value;
+  const isSold = document.getElementById('vehicle-is-sold').value;
+  const sellPrice = document.getElementById('vehicle-sell-price').value;
+  const sellDate = document.getElementById('vehicle-sell-date').value;
+  const batterySize = document.getElementById('vehicle-battery-size').value.trim();
+  const remark = document.getElementById('vehicle-remark').value.trim();
+  
+  // 验证
+  if (!name) return showToast('请输入电动车名称');
+  if (!purchasePrice) return showToast('请输入收购价格');
+  if (isSold === '是') {
+    if (!sellPrice) return showToast('请输入出售价格');
+    if (!sellDate) return showToast('请选择出售日期');
+  }
+  if (!batterySize) return showToast('请输入电池大小');
+  
+  // 检查名称是否重复
+  const vehicles = getVehicles();
+  const existingVehicle = vehicles.find(v => v.name === name && v.id !== id);
+  if (existingVehicle) return showToast('电动车名称已存在');
+  
+  // 收集成本信息
+  const costs = [];
+  document.querySelectorAll('#costs-tbody tr').forEach(row => {
+    const inputs = row.querySelectorAll('input');
+    if (inputs.length >= 2 && inputs[0].value && inputs[1].value) {
+      costs.push({
+        businessName: inputs[0].value,
+        amount: parseFloat(inputs[1].value),
+        remark: inputs[2] ? inputs[2].value : ''
+      });
+    }
+  });
+  
+  // 收集租赁利润
+  const rentals = [];
+  document.querySelectorAll('#rentals-tbody tr').forEach(row => {
+    const inputs = row.querySelectorAll('input');
+    if (inputs.length >= 3 && inputs[0].value && inputs[1].value && inputs[2].value) {
+      rentals.push({
+        startDate: inputs[0].value,
+        endDate: inputs[1].value,
+        rent: parseFloat(inputs[2].value),
+        deposit: inputs[3] ? parseFloat(inputs[3].value) : 0,
+        remark: inputs[4] ? inputs[4].value : ''
+      });
+    }
+  });
+  
+  // 收集其他利润
+  const otherProfits = [];
+  document.querySelectorAll('#other-profits-tbody tr').forEach(row => {
+    const inputs = row.querySelectorAll('input');
+    if (inputs.length >= 3 && inputs[0].value && inputs[1].value && inputs[2].value) {
+      otherProfits.push({
+        date: inputs[0].value,
+        businessName: inputs[1].value,
+        amount: parseFloat(inputs[2].value),
+        remark: inputs[3] ? inputs[3].value : ''
+      });
+    }
+  });
+  
+  const vehicleData = {
+    id: id || Date.now().toString(),
+    name,
+    purchasePrice: parseFloat(purchasePrice),
+    isSold,
+    sellPrice: isSold === '是' ? parseFloat(sellPrice) : null,
+    sellDate: isSold === '是' ? sellDate : null,
+    batterySize,
+    remark,
+    costs,
+    rentals,
+    otherProfits,
+    createTime: id ? vehicles.find(v => v.id === id).createTime : new Date().toISOString(),
+    updateTime: new Date().toISOString()
+  };
+  
+  if (id) {
+    const index = vehicles.findIndex(v => v.id === id);
+    vehicles[index] = vehicleData;
+  } else {
+    vehicles.push(vehicleData);
+  }
+  
+  saveVehicles(vehicles);
+  showToast('保存成功');
+  showPage('rental');
+  initRentalPage();
+}
+
+// 删除车辆
+function deleteVehicle(id) {
+  if (!confirm('确定要删除这辆车吗？')) return;
+  
+  const vehicles = getVehicles();
+  const index = vehicles.findIndex(v => v.id === id);
+  if (index > -1) {
+    vehicles.splice(index, 1);
+    saveVehicles(vehicles);
+    showToast('删除成功');
+    initRentalPage();
+  }
+}
+
+// 初始化
+(function init() {
+  const a = STORAGE.get('activation'), m = STORAGE.get('modules');
+  if (!a) showPage('activation');
+  else if (a.type === 'temporary' && Date.now() > a.expireTime) { STORAGE.remove('activation'); showPage('activation'); }
+  else if (!m || !m.length) showPage('modules');
+  else { showPage('home'); renderTabBar(m); }
+  renderModules();
+})();
+</script>
+</body>
+</html>
