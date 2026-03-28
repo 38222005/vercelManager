@@ -195,11 +195,31 @@
 
 <!-- 维修页面 -->
 <div id="page-maintenance" class="page">
-  <div class="gradient-bg" style="padding:24px;"><h1 style="font-size:24px;font-weight:bold;color:white;">维修服务</h1></div>
-  <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding:80px 16px;">
-    <div style="font-size:60px;margin-bottom:16px;opacity:0.5;">🔧</div>
-    <p style="color:#999;">功能开发中，敬请期待</p>
+  <div class="rental-header">
+    <h1 style="font-size:20px;font-weight:bold;color:white;">维修服务</h1>
+    <div class="rental-stats" id="maintenance-stats"></div>
   </div>
+  
+  <!-- 财务模块 -->
+  <div class="finance-grid" id="maintenance-finance" style="grid-template-columns: repeat(4, 1fr);"></div>
+  
+  <!-- 维修记录列表 -->
+  <div id="maintenance-list"></div>
+  
+  <!-- 新增按钮 -->
+  <div class="add-btn" onclick="showMaintenanceDetail()">
+    <span>+</span>
+  </div>
+</div>
+
+<!-- 维修详情页面 -->
+<div id="page-maintenance-detail" class="page">
+  <div class="detail-header">
+    <div class="back-btn" onclick="showPage('maintenance'); initMaintenancePage();">←</div>
+    <h1 style="font-size:18px;font-weight:bold;color:white;" id="maintenance-detail-title">维修详情</h1>
+  </div>
+  
+  <div id="maintenance-detail-content"></div>
 </div>
 
 <!-- 新车页面 -->
@@ -357,6 +377,7 @@ function switchTab(key, el) {
   showPage(key);
   if (key === 'rental') initRentalPage();
   if (key === 'newvehicle') initNewVehiclePage();
+  if (key === 'maintenance') initMaintenancePage();
 }
 
 function updateDate() {
@@ -1368,6 +1389,284 @@ function deleteNewVehicle(id) {
     saveNewVehicles(vehicles);
     showToast('删除成功');
     initNewVehiclePage();
+  }
+}
+
+// ========== 维修服务模块 ==========
+const MAINTENANCE_STORAGE_KEY = 'evb_maintenance';
+
+function getMaintenanceRecords() {
+  return STORAGE.get(MAINTENANCE_STORAGE_KEY) || [];
+}
+
+function saveMaintenanceRecords(records) {
+  STORAGE.set(MAINTENANCE_STORAGE_KEY, records);
+}
+
+function initMaintenancePage() {
+  updateMaintenanceStats();
+  updateMaintenanceFinance();
+  renderMaintenanceList();
+}
+
+function updateMaintenanceStats() {
+  const records = getMaintenanceRecords();
+  const now = new Date();
+  
+  const stats = {
+    total: records.length,
+    year: 0,
+    month: 0,
+    day: 0
+  };
+  
+  records.forEach(r => {
+    const repairDate = new Date(r.repairDate);
+    if (repairDate.getFullYear() === now.getFullYear()) {
+      stats.year++;
+      if (repairDate.getMonth() === now.getMonth()) {
+        stats.month++;
+        if (repairDate.getDate() === now.getDate()) {
+          stats.day++;
+        }
+      }
+    }
+  });
+  
+  document.getElementById('maintenance-stats').innerHTML = `
+    <div class="rental-stat-item">总修复: ${stats.total}</div>
+    <div class="rental-stat-item">年修复: ${stats.year}</div>
+    <div class="rental-stat-item">月修复: ${stats.month}</div>
+    <div class="rental-stat-item">日修复: ${stats.day}</div>
+  `;
+}
+
+function calculateMaintenanceProfit(record) {
+  let profit = parseFloat(record.repairAmount || 0);
+  
+  if (record.costs) {
+    record.costs.forEach(c => profit -= parseFloat(c.amount || 0));
+  }
+  
+  return profit;
+}
+
+function updateMaintenanceFinance() {
+  const records = getMaintenanceRecords();
+  const now = new Date();
+  
+  let totalProfit = 0;
+  records.forEach(r => totalProfit += calculateMaintenanceProfit(r));
+  
+  let yearProfit = 0;
+  records.forEach(r => {
+    const repairDate = new Date(r.repairDate);
+    if (repairDate.getFullYear() === now.getFullYear()) {
+      yearProfit += calculateMaintenanceProfit(r);
+    }
+  });
+  
+  let monthProfit = 0;
+  records.forEach(r => {
+    const repairDate = new Date(r.repairDate);
+    if (repairDate.getFullYear() === now.getFullYear() && repairDate.getMonth() === now.getMonth()) {
+      monthProfit += calculateMaintenanceProfit(r);
+    }
+  });
+  
+  let dayProfit = 0;
+  records.forEach(r => {
+    const repairDate = new Date(r.repairDate);
+    if (repairDate.getFullYear() === now.getFullYear() && 
+        repairDate.getMonth() === now.getMonth() && 
+        repairDate.getDate() === now.getDate()) {
+      dayProfit += calculateMaintenanceProfit(r);
+    }
+  });
+  
+  document.getElementById('maintenance-finance').innerHTML = `
+    <div class="finance-item">
+      <div class="finance-label">总利润</div>
+      <div class="finance-value">¥${totalProfit.toFixed(2)}</div>
+    </div>
+    <div class="finance-item">
+      <div class="finance-label">年利润</div>
+      <div class="finance-value">¥${yearProfit.toFixed(2)}</div>
+    </div>
+    <div class="finance-item">
+      <div class="finance-label">月利润</div>
+      <div class="finance-value">¥${monthProfit.toFixed(2)}</div>
+    </div>
+    <div class="finance-item">
+      <div class="finance-label">日利润</div>
+      <div class="finance-value">¥${dayProfit.toFixed(2)}</div>
+    </div>
+  `;
+}
+
+function renderMaintenanceList() {
+  const records = getMaintenanceRecords();
+  
+  const listHtml = records.map(r => {
+    const profit = calculateMaintenanceProfit(r);
+    
+    return `
+      <div class="vehicle-card" style="border-left: 4px solid #FF9800;">
+        <div class="vehicle-name">维修日期: ${r.repairDate || '-'}</div>
+        <div class="vehicle-info">维修故障: ${r.fault || '-'}</div>
+        <div class="vehicle-info">利润: ¥${profit.toFixed(2)}</div>
+        <div class="vehicle-actions">
+          <button class="action-btn" onclick="showMaintenanceDetail('${r.id}', 'view')">查看</button>
+          <button class="action-btn" onclick="showMaintenanceDetail('${r.id}', 'edit')">编辑</button>
+          <button class="action-btn" onclick="deleteMaintenanceRecord('${r.id}')">删除</button>
+        </div>
+      </div>
+    `;
+  }).join('');
+  
+  document.getElementById('maintenance-list').innerHTML = listHtml || '<div style="text-align:center;padding:40px;color:#999;">暂无维修记录</div>';
+}
+
+function showMaintenanceDetail(id, mode) {
+  const records = getMaintenanceRecords();
+  const record = id ? records.find(r => r.id === id) : null;
+  const isNew = !id;
+  const isView = mode === 'view';
+  
+  document.getElementById('maintenance-detail-title').textContent = '维修详情';
+  
+  const profit = record ? calculateMaintenanceProfit(record) : 0;
+  
+  let html = `
+    <div class="detail-section">
+      <div class="section-title">基本信息</div>
+      <div class="form-row">
+        <label class="form-label">维修日期 <span class="required-star">*</span></label>
+        <input type="date" class="form-input" id="mt-repair-date" value="${record ? record.repairDate : new Date().toISOString().split('T')[0]}" ${isView ? 'disabled' : ''}>
+      </div>
+      <div class="form-row">
+        <label class="form-label">维修金额 <span class="required-star">*</span></label>
+        <input type="number" class="form-input" id="mt-repair-amount" value="${record ? record.repairAmount : ''}" ${isView ? 'disabled' : ''} placeholder="请输入维修金额">
+      </div>
+      <div class="form-row">
+        <label class="form-label">维修故障</label>
+        <input type="text" class="form-input" id="mt-fault" value="${record ? record.fault : ''}" ${isView ? 'disabled' : ''} placeholder="请输入维修故障">
+      </div>
+      <div class="form-row">
+        <label class="form-label">备注</label>
+        <textarea class="form-input" id="mt-remark" ${isView ? 'disabled' : ''} rows="3" placeholder="请输入备注">${record ? record.remark : ''}</textarea>
+      </div>
+    </div>
+    
+    ${record && isView ? `
+    <div class="detail-section">
+      <div class="section-title">利润分析</div>
+      <div class="profit-analysis">
+        <div class="profit-row"><span>维修金额:</span><span>¥${(record.repairAmount || 0).toFixed(2)}</span></div>
+        <div class="profit-row"><span>成本总计:</span><span>-¥${(record.costs || []).reduce((sum, c) => sum + (c.amount || 0), 0).toFixed(2)}</span></div>
+        <div class="profit-row total"><span>利润:</span><span>¥${profit.toFixed(2)}</span></div>
+      </div>
+    </div>
+    ` : ''}
+    
+    <div class="detail-section">
+      <div class="section-title">成本信息 ${!isView ? '<button class="add-row-btn" onclick="addMaintenanceCostRow()">+ 添加</button>' : ''}</div>
+      <table class="sub-table">
+        <thead>
+          <tr><th>成本信息 <span class="required-star">*</span></th><th>成本金额 <span class="required-star">*</span></th><th>备注</th>${!isView ? '<th></th>' : ''}</tr>
+        </thead>
+        <tbody id="mt-costs-tbody">
+          ${record && record.costs ? record.costs.map((c, i) => renderMaintenanceCostRow(c, i, isView)).join('') : ''}
+        </tbody>
+      </table>
+    </div>
+    
+    ${!isView ? `
+    <div class="btn-group">
+      <button class="btn-save" onclick="saveMaintenanceRecord('${id || ''}')">保存</button>
+      <button class="btn-cancel" onclick="showPage('maintenance'); initMaintenancePage();">取消</button>
+    </div>
+    ` : ''}
+  `;
+  
+  document.getElementById('maintenance-detail-content').innerHTML = html;
+  showPage('maintenance-detail');
+}
+
+function renderMaintenanceCostRow(cost, index, isView) {
+  return `
+    <tr>
+      <td><input type="text" value="${cost.costName || ''}" ${isView ? 'disabled' : ''}></td>
+      <td><input type="number" value="${cost.amount || ''}" ${isView ? 'disabled' : ''}></td>
+      <td><input type="text" value="${cost.remark || ''}" ${isView ? 'disabled' : ''}></td>
+      ${!isView ? `<td><span class="delete-row" onclick="this.parentElement.parentElement.remove()">×</span></td>` : ''}
+    </tr>
+  `;
+}
+
+function addMaintenanceCostRow() {
+  const tbody = document.getElementById('mt-costs-tbody');
+  const index = tbody.children.length;
+  tbody.insertAdjacentHTML('beforeend', renderMaintenanceCostRow({}, index, false));
+}
+
+function saveMaintenanceRecord(id) {
+  const repairDate = document.getElementById('mt-repair-date').value;
+  const repairAmount = document.getElementById('mt-repair-amount').value;
+  const fault = document.getElementById('mt-fault').value.trim();
+  const remark = document.getElementById('mt-remark').value.trim();
+  
+  if (!repairDate) return showToast('请选择维修日期');
+  if (!repairAmount) return showToast('请输入维修金额');
+  
+  const records = getMaintenanceRecords();
+  
+  const costs = [];
+  document.querySelectorAll('#mt-costs-tbody tr').forEach(row => {
+    const inputs = row.querySelectorAll('input');
+    if (inputs.length >= 2 && inputs[0].value && inputs[1].value) {
+      costs.push({
+        costName: inputs[0].value,
+        amount: parseFloat(inputs[1].value),
+        remark: inputs[2] ? inputs[2].value : ''
+      });
+    }
+  });
+  
+  const recordData = {
+    id: id || Date.now().toString(),
+    repairDate,
+    repairAmount: parseFloat(repairAmount),
+    fault,
+    remark,
+    costs,
+    createTime: id ? records.find(r => r.id === id).createTime : new Date().toISOString(),
+    updateTime: new Date().toISOString()
+  };
+  
+  if (id) {
+    const index = records.findIndex(r => r.id === id);
+    records[index] = recordData;
+  } else {
+    records.push(recordData);
+  }
+  
+  saveMaintenanceRecords(records);
+  showToast('保存成功');
+  showPage('maintenance');
+  initMaintenancePage();
+}
+
+function deleteMaintenanceRecord(id) {
+  if (!confirm('确定要删除这条维修记录吗？')) return;
+  
+  const records = getMaintenanceRecords();
+  const index = records.findIndex(r => r.id === id);
+  if (index > -1) {
+    records.splice(index, 1);
+    saveMaintenanceRecords(records);
+    showToast('删除成功');
+    initMaintenancePage();
   }
 }
 
