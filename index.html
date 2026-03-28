@@ -203,7 +203,8 @@
   </div>
   
   <!-- 财务模块 -->
-  <div class="finance-grid" id="maintenance-finance" style="grid-template-columns: repeat(4, 1fr);"></div>
+  <div class="finance-grid" id="maintenance-finance-profit" style="grid-template-columns: repeat(3, 1fr);"></div>
+  <div class="finance-grid" id="maintenance-finance-count" style="grid-template-columns: repeat(3, 1fr);"></div>
   
   <!-- 维修记录列表 -->
   <div id="maintenance-list"></div>
@@ -1436,31 +1437,16 @@ function updateMaintenanceStats() {
   const records = getMaintenanceRecords();
   const now = new Date();
   
-  const stats = {
-    total: records.length,
-    year: 0,
-    month: 0,
-    day: 0
-  };
+  let totalProfit = 0;
+  let totalRepair = records.length;
   
   records.forEach(r => {
-    const repairDate = new Date(r.repairDate);
-    if (repairDate.getFullYear() === now.getFullYear()) {
-      stats.year++;
-      if (repairDate.getMonth() === now.getMonth()) {
-        stats.month++;
-        if (repairDate.getDate() === now.getDate()) {
-          stats.day++;
-        }
-      }
-    }
+    totalProfit += calculateMaintenanceProfit(r);
   });
   
   document.getElementById('maintenance-stats').innerHTML = `
-    <div class="rental-stat-item">总修复: ${stats.total}</div>
-    <div class="rental-stat-item">年修复: ${stats.year}</div>
-    <div class="rental-stat-item">月修复: ${stats.month}</div>
-    <div class="rental-stat-item">日修复: ${stats.day}</div>
+    <div class="rental-stat-item">总利润: ¥${totalProfit.toFixed(2)}</div>
+    <div class="rental-stat-item">总修复: ${totalRepair}</div>
   `;
 }
 
@@ -1478,40 +1464,28 @@ function updateMaintenanceFinance() {
   const records = getMaintenanceRecords();
   const now = new Date();
   
-  let totalProfit = 0;
-  records.forEach(r => totalProfit += calculateMaintenanceProfit(r));
+  let yearProfit = 0, monthProfit = 0, dayProfit = 0;
+  let yearRepair = 0, monthRepair = 0, dayRepair = 0;
   
-  let yearProfit = 0;
   records.forEach(r => {
     const repairDate = new Date(r.repairDate);
+    const profit = calculateMaintenanceProfit(r);
+    
     if (repairDate.getFullYear() === now.getFullYear()) {
-      yearProfit += calculateMaintenanceProfit(r);
+      yearProfit += profit;
+      yearRepair++;
+      if (repairDate.getMonth() === now.getMonth()) {
+        monthProfit += profit;
+        monthRepair++;
+        if (repairDate.getDate() === now.getDate()) {
+          dayProfit += profit;
+          dayRepair++;
+        }
+      }
     }
   });
   
-  let monthProfit = 0;
-  records.forEach(r => {
-    const repairDate = new Date(r.repairDate);
-    if (repairDate.getFullYear() === now.getFullYear() && repairDate.getMonth() === now.getMonth()) {
-      monthProfit += calculateMaintenanceProfit(r);
-    }
-  });
-  
-  let dayProfit = 0;
-  records.forEach(r => {
-    const repairDate = new Date(r.repairDate);
-    if (repairDate.getFullYear() === now.getFullYear() && 
-        repairDate.getMonth() === now.getMonth() && 
-        repairDate.getDate() === now.getDate()) {
-      dayProfit += calculateMaintenanceProfit(r);
-    }
-  });
-  
-  document.getElementById('maintenance-finance').innerHTML = `
-    <div class="finance-item">
-      <div class="finance-label">总利润</div>
-      <div class="finance-value">¥${totalProfit.toFixed(2)}</div>
-    </div>
+  document.getElementById('maintenance-finance-profit').innerHTML = `
     <div class="finance-item">
       <div class="finance-label">年利润</div>
       <div class="finance-value">¥${yearProfit.toFixed(2)}</div>
@@ -1523,6 +1497,21 @@ function updateMaintenanceFinance() {
     <div class="finance-item">
       <div class="finance-label">日利润</div>
       <div class="finance-value">¥${dayProfit.toFixed(2)}</div>
+    </div>
+  `;
+  
+  document.getElementById('maintenance-finance-count').innerHTML = `
+    <div class="finance-item">
+      <div class="finance-label">年修复</div>
+      <div class="finance-value">${yearRepair}</div>
+    </div>
+    <div class="finance-item">
+      <div class="finance-label">月修复</div>
+      <div class="finance-value">${monthRepair}</div>
+    </div>
+    <div class="finance-item">
+      <div class="finance-label">日修复</div>
+      <div class="finance-value">${dayRepair}</div>
     </div>
   `;
 }
