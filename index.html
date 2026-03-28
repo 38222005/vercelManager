@@ -369,6 +369,73 @@ const MODULES = [
   { key: 'newvehicle', name: '新车销售管理', desc: '新车销售管理', icon: '🚗' }
 ];
 
+const PROFIT_CONFIG = {
+  rental: { label: '租赁利润', color: '#667eea', profitKey: 'rentalProfit' },
+  newvehicle: { label: '新车利润', color: '#4CAF50', profitKey: 'newVehicleProfit' },
+  maintenance: { label: '维修利润', color: '#FF9800', profitKey: 'maintenanceProfit' },
+  other: { label: '其他净收入', color: '#9C27B0', profitKey: 'otherNetIncome', required: true }
+};
+
+function getDisplayModules() {
+  const selected = STORAGE.get('modules') || [];
+  selected.push('other');
+  return selected;
+}
+
+function getChartConfig(profits) {
+  const displayModules = getDisplayModules();
+  const moduleOrder = ['rental', 'newvehicle', 'maintenance', 'other'];
+  
+  const labels = [];
+  const data = [];
+  const backgroundColor = [];
+  
+  moduleOrder.forEach(key => {
+    if (displayModules.includes(key)) {
+      const config = PROFIT_CONFIG[key];
+      labels.push(config.label);
+      backgroundColor.push(config.color);
+      data.push(Math.max(0, profits[config.profitKey]));
+    }
+  });
+  
+  return { labels, data, backgroundColor };
+}
+
+function getProfitSummaryHtml(profits) {
+  const displayModules = getDisplayModules();
+  const moduleOrder = ['rental', 'newvehicle', 'maintenance', 'other'];
+  
+  let html = '';
+  moduleOrder.forEach(key => {
+    if (displayModules.includes(key)) {
+      const config = PROFIT_CONFIG[key];
+      html += `<div style="display:flex;justify-content:space-between;margin-bottom:8px;"><span style="color:${config.color};">● ${config.label}</span><span>¥${profits[config.profitKey].toFixed(2)}</span></div>`;
+    }
+  });
+  
+  return html;
+}
+
+function getBarDatasets(dataArray) {
+  const displayModules = getDisplayModules();
+  const moduleOrder = ['rental', 'newvehicle', 'maintenance', 'other'];
+  const datasets = [];
+  
+  moduleOrder.forEach(key => {
+    if (displayModules.includes(key)) {
+      const config = PROFIT_CONFIG[key];
+      datasets.push({
+        label: config.label,
+        data: dataArray.map(d => Math.max(0, d[config.profitKey])),
+        backgroundColor: config.color
+      });
+    }
+  });
+  
+  return datasets;
+}
+
 function showToast(msg) {
   const t = document.createElement('div');
   t.className = 'toast';
@@ -583,6 +650,7 @@ let profitChart = null;
 
 function renderProfitChart() {
   const profits = calculateTotalProfit();
+  const chartConfig = getChartConfig(profits);
   
   const ctx = document.getElementById('profitChart');
   if (!ctx) return;
@@ -591,20 +659,13 @@ function renderProfitChart() {
     profitChart.destroy();
   }
   
-  const data = [
-    Math.max(0, profits.rentalProfit),
-    Math.max(0, profits.newVehicleProfit),
-    Math.max(0, profits.maintenanceProfit),
-    Math.max(0, profits.otherNetIncome)
-  ];
-  
   profitChart = new Chart(ctx, {
     type: 'pie',
     data: {
-      labels: ['租赁利润', '新车利润', '维修利润', '其他净收入'],
+      labels: chartConfig.labels,
       datasets: [{
-        data: data,
-        backgroundColor: ['#667eea', '#4CAF50', '#FF9800', '#9C27B0'],
+        data: chartConfig.data,
+        backgroundColor: chartConfig.backgroundColor,
         borderWidth: 2,
         borderColor: '#fff'
       }]
@@ -628,23 +689,7 @@ function renderProfitChart() {
     }
   });
   
-  document.getElementById('profit-summary').innerHTML = `
-    <div style="display:flex;justify-content:space-between;margin-bottom:8px;">
-      <span style="color:#667eea;">● 租赁利润</span>
-      <span>¥${profits.rentalProfit.toFixed(2)}</span>
-    </div>
-    <div style="display:flex;justify-content:space-between;margin-bottom:8px;">
-      <span style="color:#4CAF50;">● 新车利润</span>
-      <span>¥${profits.newVehicleProfit.toFixed(2)}</span>
-    </div>
-    <div style="display:flex;justify-content:space-between;margin-bottom:8px;">
-      <span style="color:#FF9800;">● 维修利润</span>
-      <span>¥${profits.maintenanceProfit.toFixed(2)}</span>
-    </div>
-    <div style="display:flex;justify-content:space-between;margin-bottom:8px;">
-      <span style="color:#9C27B0;">● 其他净收入</span>
-      <span>¥${profits.otherNetIncome.toFixed(2)}</span>
-    </div>
+  document.getElementById('profit-summary').innerHTML = getProfitSummaryHtml(profits) + `
     <div style="display:flex;justify-content:space-between;padding-top:8px;border-top:2px solid #f0f0f0;font-weight:bold;font-size:16px;">
       <span>总利润</span>
       <span>¥${profits.total.toFixed(2)}</span>
@@ -713,6 +758,7 @@ function calculateDayProfit(dateStr) {
 
 function renderDayProfitChart(dateStr) {
   const dayProfit = calculateDayProfit(dateStr);
+  const chartConfig = getChartConfig(dayProfit);
   
   const ctx = document.getElementById('dayProfitChart');
   if (!ctx) return;
@@ -721,20 +767,13 @@ function renderDayProfitChart(dateStr) {
     dayProfitChart.destroy();
   }
   
-  const data = [
-    Math.max(0, dayProfit.rentalProfit),
-    Math.max(0, dayProfit.newVehicleProfit),
-    Math.max(0, dayProfit.maintenanceProfit),
-    Math.max(0, dayProfit.otherNetIncome)
-  ];
-  
   dayProfitChart = new Chart(ctx, {
     type: 'pie',
     data: {
-      labels: ['租赁利润', '新车利润', '维修利润', '其他净收入'],
+      labels: chartConfig.labels,
       datasets: [{
-        data: data,
-        backgroundColor: ['#667eea', '#4CAF50', '#FF9800', '#9C27B0'],
+        data: chartConfig.data,
+        backgroundColor: chartConfig.backgroundColor,
         borderWidth: 2,
         borderColor: '#fff'
       }]
@@ -758,23 +797,7 @@ function renderDayProfitChart(dateStr) {
     }
   });
   
-  document.getElementById('day-profit-summary').innerHTML = `
-    <div style="display:flex;justify-content:space-between;margin-bottom:8px;">
-      <span style="color:#667eea;">● 租赁利润</span>
-      <span>¥${dayProfit.rentalProfit.toFixed(2)}</span>
-    </div>
-    <div style="display:flex;justify-content:space-between;margin-bottom:8px;">
-      <span style="color:#4CAF50;">● 新车利润</span>
-      <span>¥${dayProfit.newVehicleProfit.toFixed(2)}</span>
-    </div>
-    <div style="display:flex;justify-content:space-between;margin-bottom:8px;">
-      <span style="color:#FF9800;">● 维修利润</span>
-      <span>¥${dayProfit.maintenanceProfit.toFixed(2)}</span>
-    </div>
-    <div style="display:flex;justify-content:space-between;margin-bottom:8px;">
-      <span style="color:#9C27B0;">● 其他净收入</span>
-      <span>¥${dayProfit.otherNetIncome.toFixed(2)}</span>
-    </div>
+  document.getElementById('day-profit-summary').innerHTML = getProfitSummaryHtml(dayProfit) + `
     <div style="display:flex;justify-content:space-between;padding-top:8px;border-top:2px solid #f0f0f0;font-weight:bold;font-size:16px;">
       <span>日利润</span>
       <span>¥${dayProfit.total.toFixed(2)}</span>
@@ -868,10 +891,12 @@ function renderMonthProfitChart(yearMonth) {
   }
   
   const monthTotal = dailyData.reduce((sum, d) => sum + d.total, 0);
-  const rentalTotal = dailyData.reduce((sum, d) => sum + d.rentalProfit, 0);
-  const newVehicleTotal = dailyData.reduce((sum, d) => sum + d.newVehicleProfit, 0);
-  const maintenanceTotal = dailyData.reduce((sum, d) => sum + d.maintenanceProfit, 0);
-  const otherTotal = dailyData.reduce((sum, d) => sum + d.otherNetIncome, 0);
+  const monthProfits = {
+    rentalProfit: dailyData.reduce((sum, d) => sum + d.rentalProfit, 0),
+    newVehicleProfit: dailyData.reduce((sum, d) => sum + d.newVehicleProfit, 0),
+    maintenanceProfit: dailyData.reduce((sum, d) => sum + d.maintenanceProfit, 0),
+    otherNetIncome: dailyData.reduce((sum, d) => sum + d.otherNetIncome, 0)
+  };
   
   const maxDaily = Math.max(...dailyData.map(d => d.total), 0);
   const yMax = Math.ceil(maxDaily * 1.1 / 10) * 10 || 100;
@@ -882,16 +907,13 @@ function renderMonthProfitChart(yearMonth) {
   
   if (monthProfitChart) monthProfitChart.destroy();
   
+  const datasets = getBarDatasets(dailyData);
+  
   monthProfitChart = new Chart(ctx, {
     type: 'bar',
     data: {
       labels: dailyData.map(d => d.day + '日'),
-      datasets: [
-        { label: '租赁利润', data: dailyData.map(d => d.rentalProfit), backgroundColor: '#667eea' },
-        { label: '新车利润', data: dailyData.map(d => d.newVehicleProfit), backgroundColor: '#4CAF50' },
-        { label: '维修利润', data: dailyData.map(d => d.maintenanceProfit), backgroundColor: '#FF9800' },
-        { label: '其他收入', data: dailyData.map(d => d.otherNetIncome), backgroundColor: '#9C27B0' }
-      ]
+      datasets: datasets
     },
     options: {
       responsive: true,
@@ -907,11 +929,7 @@ function renderMonthProfitChart(yearMonth) {
     }
   });
   
-  document.getElementById('month-profit-summary').innerHTML = `
-    <div style="display:flex;justify-content:space-between;margin-bottom:8px;"><span style="color:#667eea;">● 租赁利润</span><span>¥${rentalTotal.toFixed(2)}</span></div>
-    <div style="display:flex;justify-content:space-between;margin-bottom:8px;"><span style="color:#4CAF50;">● 新车利润</span><span>¥${newVehicleTotal.toFixed(2)}</span></div>
-    <div style="display:flex;justify-content:space-between;margin-bottom:8px;"><span style="color:#FF9800;">● 维修利润</span><span>¥${maintenanceTotal.toFixed(2)}</span></div>
-    <div style="display:flex;justify-content:space-between;margin-bottom:8px;"><span style="color:#9C27B0;">● 其他净收入</span><span>¥${otherTotal.toFixed(2)}</span></div>
+  document.getElementById('month-profit-summary').innerHTML = getProfitSummaryHtml(monthProfits) + `
     <div style="display:flex;justify-content:space-between;padding-top:8px;border-top:2px solid #f0f0f0;font-weight:bold;font-size:16px;"><span>月利润</span><span>¥${monthTotal.toFixed(2)}</span></div>
   `;
 }
@@ -1067,16 +1085,13 @@ function renderYearProfitChart(year) {
   
   if (monthlyChart) monthlyChart.destroy();
   
+  const datasets = getBarDatasets(monthlyData);
+  
   monthlyChart = new Chart(ctx, {
     type: 'bar',
     data: {
       labels: ['1月','2月','3月','4月','5月','6月','7月','8月','9月','10月','11月','12月'],
-      datasets: [
-        { label: '租赁利润', data: monthlyData.map(m => m.rentalProfit), backgroundColor: '#667eea' },
-        { label: '新车利润', data: monthlyData.map(m => m.newVehicleProfit), backgroundColor: '#4CAF50' },
-        { label: '维修利润', data: monthlyData.map(m => m.maintenanceProfit), backgroundColor: '#FF9800' },
-        { label: '其他收入', data: monthlyData.map(m => m.otherNetIncome), backgroundColor: '#9C27B0' }
-      ]
+      datasets: datasets
     },
     options: {
       responsive: true,
@@ -1092,11 +1107,7 @@ function renderYearProfitChart(year) {
     }
   });
   
-  document.getElementById('year-profit-summary').innerHTML = `
-    <div style="display:flex;justify-content:space-between;margin-bottom:8px;"><span style="color:#667eea;">● 租赁利润</span><span>¥${yearProfit.rentalProfit.toFixed(2)}</span></div>
-    <div style="display:flex;justify-content:space-between;margin-bottom:8px;"><span style="color:#4CAF50;">● 新车利润</span><span>¥${yearProfit.newVehicleProfit.toFixed(2)}</span></div>
-    <div style="display:flex;justify-content:space-between;margin-bottom:8px;"><span style="color:#FF9800;">● 维修利润</span><span>¥${yearProfit.maintenanceProfit.toFixed(2)}</span></div>
-    <div style="display:flex;justify-content:space-between;margin-bottom:8px;"><span style="color:#9C27B0;">● 其他净收入</span><span>¥${yearProfit.otherNetIncome.toFixed(2)}</span></div>
+  document.getElementById('year-profit-summary').innerHTML = getProfitSummaryHtml(yearProfit) + `
     <div style="display:flex;justify-content:space-between;padding-top:8px;border-top:2px solid #f0f0f0;font-weight:bold;font-size:16px;"><span>本年总利润</span><span>¥${yearProfit.total.toFixed(2)}</span></div>
   `;
 }
