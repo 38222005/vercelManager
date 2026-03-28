@@ -152,7 +152,7 @@
 <!-- 二手页面 -->
 <div id="page-rental" class="page">
   <div class="rental-header">
-    <h1 style="font-size:20px;font-weight:bold;color:white;">二手</h1>
+    <h1 style="font-size:20px;font-weight:bold;color:white;">二手、租赁管理</h1>
     <div class="rental-stats" id="rental-stats"></div>
   </div>
   
@@ -205,12 +205,19 @@
 <!-- 新车页面 -->
 <div id="page-newvehicle" class="page">
   <div class="rental-header">
-    <h1 style="font-size:20px;font-weight:bold;color:white;">新车</h1>
+    <h1 style="font-size:20px;font-weight:bold;color:white;">新车销售管理</h1>
     <div class="rental-stats" id="newvehicle-stats"></div>
   </div>
   
   <!-- 财务模块 -->
   <div class="finance-grid" id="newvehicle-finance" style="grid-template-columns: repeat(3, 1fr);"></div>
+  
+  <!-- 筛选功能 -->
+  <div class="filter-bar">
+    <input type="text" class="filter-input" id="nv-filter-phone" placeholder="客户手机号" maxlength="11">
+    <input type="text" class="filter-input" id="nv-filter-frame" placeholder="车架号">
+    <button class="filter-btn" onclick="filterNewVehicleList()">筛选</button>
+  </div>
   
   <!-- 车辆列表 -->
   <div id="newvehicle-list"></div>
@@ -254,9 +261,9 @@ const STORAGE = {
 
 const CODES = { TEMPORARY: '13255405952', PERMANENT: '15965867361' };
 const MODULES = [
-  { key: 'rental', name: '二手', desc: '二手车买卖管理', icon: '📋' },
+  { key: 'rental', name: '二手、租赁管理', desc: '二手车买卖管理', icon: '📋' },
   { key: 'maintenance', name: '维修服务', desc: '预约维修保养', icon: '🔧' },
-  { key: 'newvehicle', name: '新车', desc: '新车销售管理', icon: '🚗' }
+  { key: 'newvehicle', name: '新车销售管理', desc: '新车销售管理', icon: '🚗' }
 ];
 
 function showToast(msg) {
@@ -1101,8 +1108,20 @@ function calculateNewVehicleProfit(vehicle) {
 // 渲染新车列表
 function renderNewVehicleList() {
   const vehicles = getNewVehicles();
+  const filterPhone = document.getElementById('nv-filter-phone')?.value.trim() || '';
+  const filterFrame = document.getElementById('nv-filter-frame')?.value.trim() || '';
   
-  const listHtml = vehicles.map(v => {
+  let filtered = vehicles;
+  
+  if (filterPhone || filterFrame) {
+    filtered = vehicles.filter(v => {
+      const matchPhone = filterPhone && v.customerPhone === filterPhone;
+      const matchFrame = filterFrame && v.frameNo && v.frameNo === filterFrame;
+      return matchPhone || matchFrame;
+    });
+  }
+  
+  const listHtml = filtered.map(v => {
     const profit = calculateNewVehicleProfit(v);
     
     return `
@@ -1121,6 +1140,10 @@ function renderNewVehicleList() {
   }).join('');
   
   document.getElementById('newvehicle-list').innerHTML = listHtml || '<div style="text-align:center;padding:40px;color:#999;">暂无销售记录</div>';
+}
+
+function filterNewVehicleList() {
+  renderNewVehicleList();
 }
 
 // 显示新车详情
