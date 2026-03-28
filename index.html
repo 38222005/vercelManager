@@ -146,15 +146,6 @@
     <p style="color:rgba(255,255,255,0.8);font-size:14px;margin-top:4px;" id="current-date"></p>
   </div>
   
-  <!-- 总利润饼图卡片 -->
-  <div class="card">
-    <div style="font-size:16px;font-weight:bold;margin-bottom:16px;">总利润分析</div>
-    <div style="display:flex;align-items:center;justify-content:center;">
-      <canvas id="profitChart" style="max-width:260px;max-height:260px;"></canvas>
-    </div>
-    <div id="profit-summary" style="margin-top:16px;padding-top:16px;border-top:1px solid #f0f0f0;"></div>
-  </div>
-  
   <!-- 日利润饼图卡片 -->
   <div class="card">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
@@ -173,10 +164,13 @@
       <div style="font-size:16px;font-weight:bold;">月利润分析</div>
       <input type="month" id="month-selector" onchange="changeMonth()" style="padding:6px 12px;border:1px solid #ddd;border-radius:6px;font-size:14px;background:white;">
     </div>
-    <div style="margin-top:16px;">
-      <canvas id="monthProfitChart"></canvas>
+    <div style="overflow-x:auto;overflow-y:hidden;-webkit-overflow-scrolling:touch;margin-top:16px;">
+      <div id="month-chart-container" style="min-width:600px;">
+        <canvas id="monthProfitChart"></canvas>
+      </div>
     </div>
     <div id="month-profit-summary" style="margin-top:16px;padding-top:16px;border-top:1px solid #f0f0f0;"></div>
+    <div style="text-align:center;color:#999;font-size:12px;">← 左右滑动查看更多 →</div>
   </div>
   
   <!-- 年度利润柱状图卡片 -->
@@ -189,6 +183,15 @@
       <canvas id="monthlyProfitChart"></canvas>
     </div>
     <div id="year-profit-summary" style="margin-top:16px;padding-top:16px;border-top:1px solid #f0f0f0;"></div>
+  </div>
+  
+  <!-- 总利润饼图卡片 -->
+  <div class="card">
+    <div style="font-size:16px;font-weight:bold;margin-bottom:16px;">总利润分析</div>
+    <div style="display:flex;align-items:center;justify-content:center;">
+      <canvas id="profitChart" style="max-width:260px;max-height:260px;"></canvas>
+    </div>
+    <div id="profit-summary" style="margin-top:16px;padding-top:16px;border-top:1px solid #f0f0f0;"></div>
   </div>
   
   <!-- 设置按钮 -->
@@ -855,6 +858,14 @@ function calculateMonthDailyProfit(year, month) {
 function renderMonthProfitChart(yearMonth) {
   const [year, month] = yearMonth.split('-').map(Number);
   const dailyData = calculateMonthDailyProfit(year, month - 1);
+  
+  // 动态计算图表最小宽度
+  const daysInMonth = dailyData.length;
+  const minWidth = Math.max(daysInMonth * 18, 350);
+  const chartContainer = document.getElementById('month-chart-container');
+  if (chartContainer) {
+    chartContainer.style.minWidth = minWidth + 'px';
+  }
   
   const monthTotal = dailyData.reduce((sum, d) => sum + d.total, 0);
   const rentalTotal = dailyData.reduce((sum, d) => sum + d.rentalProfit, 0);
