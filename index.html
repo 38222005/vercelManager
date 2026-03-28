@@ -261,6 +261,11 @@
 
 <!-- 其他页面 -->
 <div id="page-other" class="page">
+  <!-- 头部统计 -->
+  <div class="rental-header">
+    <div class="rental-stats" id="other-stats"></div>
+  </div>
+  
   <!-- 统计模块（两排六个） -->
   <div class="finance-grid" id="other-finance-income" style="grid-template-columns: repeat(3, 1fr);"></div>
   <div class="finance-grid" id="other-finance-expense" style="grid-template-columns: repeat(3, 1fr);"></div>
@@ -1708,37 +1713,36 @@ function updateOtherFinance() {
   const records = getOtherRecords();
   const now = new Date();
   
+  let totalIncome = 0, totalExpense = 0;
   let yearIncome = 0, monthIncome = 0, dayIncome = 0;
+  let yearExpense = 0, monthExpense = 0, dayExpense = 0;
+  
   records.forEach(r => {
     const billDate = new Date(r.billDate);
     const incomeSum = (r.incomes || []).reduce((sum, i) => sum + (i.amount || 0), 0);
+    const expenseSum = (r.expenses || []).reduce((sum, e) => sum + (e.amount || 0), 0);
+    
+    totalIncome += incomeSum;
+    totalExpense += expenseSum;
     
     if (billDate.getFullYear() === now.getFullYear()) {
       yearIncome += incomeSum;
-      if (billDate.getMonth() === now.getMonth()) {
-        monthIncome += incomeSum;
-        if (billDate.getDate() === now.getDate()) {
-          dayIncome += incomeSum;
-        }
-      }
-    }
-  });
-  
-  let yearExpense = 0, monthExpense = 0, dayExpense = 0;
-  records.forEach(r => {
-    const billDate = new Date(r.billDate);
-    const expenseSum = (r.expenses || []).reduce((sum, e) => sum + (e.amount || 0), 0);
-    
-    if (billDate.getFullYear() === now.getFullYear()) {
       yearExpense += expenseSum;
       if (billDate.getMonth() === now.getMonth()) {
+        monthIncome += incomeSum;
         monthExpense += expenseSum;
         if (billDate.getDate() === now.getDate()) {
+          dayIncome += incomeSum;
           dayExpense += expenseSum;
         }
       }
     }
   });
+  
+  document.getElementById('other-stats').innerHTML = `
+    <div class="rental-stat-item">总收入: ¥${totalIncome.toFixed(2)}</div>
+    <div class="rental-stat-item">总支出: ¥${totalExpense.toFixed(2)}</div>
+  `;
   
   document.getElementById('other-finance-income').innerHTML = `
     <div class="finance-item">
