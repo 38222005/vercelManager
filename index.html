@@ -204,11 +204,31 @@
 
 <!-- 新车页面 -->
 <div id="page-newvehicle" class="page">
-  <div class="gradient-bg" style="padding:24px;"><h1 style="font-size:24px;font-weight:bold;color:white;">新车选购</h1></div>
-  <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding:80px 16px;">
-    <div style="font-size:60px;margin-bottom:16px;opacity:0.5;">🚗</div>
-    <p style="color:#999;">功能开发中，敬请期待</p>
+  <div class="rental-header">
+    <h1 style="font-size:20px;font-weight:bold;color:white;">新车</h1>
+    <div class="rental-stats" id="newvehicle-stats"></div>
   </div>
+  
+  <!-- 财务模块 -->
+  <div class="finance-grid" id="newvehicle-finance" style="grid-template-columns: repeat(3, 1fr);"></div>
+  
+  <!-- 车辆列表 -->
+  <div id="newvehicle-list"></div>
+  
+  <!-- 新增按钮 -->
+  <div class="add-btn" onclick="showNewVehicleDetail()">
+    <span>+</span>
+  </div>
+</div>
+
+<!-- 新车详情页面 -->
+<div id="page-newvehicle-detail" class="page">
+  <div class="detail-header">
+    <div class="back-btn" onclick="showPage('newvehicle'); initNewVehiclePage();">←</div>
+    <h1 style="font-size:18px;font-weight:bold;color:white;" id="newvehicle-detail-title">新车详情</h1>
+  </div>
+  
+  <div id="newvehicle-detail-content"></div>
 </div>
 
 <!-- 其他页面 -->
@@ -236,7 +256,7 @@ const CODES = { TEMPORARY: '13255405952', PERMANENT: '15965867361' };
 const MODULES = [
   { key: 'rental', name: '二手', desc: '二手车买卖管理', icon: '📋' },
   { key: 'maintenance', name: '维修服务', desc: '预约维修保养', icon: '🔧' },
-  { key: 'newvehicle', name: '新车选购', desc: '新车浏览购买', icon: '🚗' }
+  { key: 'newvehicle', name: '新车', desc: '新车销售管理', icon: '🚗' }
 ];
 
 function showToast(msg) {
@@ -328,10 +348,8 @@ function switchTab(key, el) {
   document.querySelectorAll('.tab-item').forEach(t => t.classList.remove('active'));
   el.classList.add('active');
   showPage(key);
-  // 切换到租赁页面时初始化
-  if (key === 'rental') {
-    initRentalPage();
-  }
+  if (key === 'rental') initRentalPage();
+  if (key === 'newvehicle') initNewVehiclePage();
 }
 
 function updateDate() {
@@ -964,6 +982,369 @@ function deleteVehicle(id) {
     saveVehicles(vehicles);
     showToast('删除成功');
     initRentalPage();
+  }
+}
+
+// ========== 新车销售模块 ==========
+const NEW_VEHICLE_STORAGE_KEY = 'evb_new_vehicles';
+
+// 获取新车列表
+function getNewVehicles() {
+  return STORAGE.get(NEW_VEHICLE_STORAGE_KEY) || [];
+}
+
+// 保存新车列表
+function saveNewVehicles(vehicles) {
+  STORAGE.set(NEW_VEHICLE_STORAGE_KEY, vehicles);
+}
+
+// 初始化新车页面
+function initNewVehiclePage() {
+  updateNewVehicleStats();
+  updateNewVehicleFinance();
+  renderNewVehicleList();
+}
+
+// 更新统计信息
+function updateNewVehicleStats() {
+  const vehicles = getNewVehicles();
+  const now = new Date();
+  
+  const stats = {
+    total: vehicles.length,
+    year: 0,
+    month: 0,
+    day: 0
+  };
+  
+  vehicles.forEach(v => {
+    const sellDate = new Date(v.sellDate);
+    if (sellDate.getFullYear() === now.getFullYear()) {
+      stats.year++;
+      if (sellDate.getMonth() === now.getMonth()) {
+        stats.month++;
+        if (sellDate.getDate() === now.getDate()) {
+          stats.day++;
+        }
+      }
+    }
+  });
+  
+  document.getElementById('newvehicle-stats').innerHTML = `
+    <div class="rental-stat-item">总交付: ${stats.total}</div>
+    <div class="rental-stat-item">年交付: ${stats.year}</div>
+    <div class="rental-stat-item">月交付: ${stats.month}</div>
+    <div class="rental-stat-item">日交付: ${stats.day}</div>
+  `;
+}
+
+// 更新财务模块
+function updateNewVehicleFinance() {
+  const vehicles = getNewVehicles();
+  const now = new Date();
+  
+  // 总利润
+  let totalProfit = 0;
+  vehicles.forEach(v => totalProfit += calculateNewVehicleProfit(v));
+  
+  // 年利润
+  let yearProfit = 0;
+  vehicles.forEach(v => {
+    const sellDate = new Date(v.sellDate);
+    if (sellDate.getFullYear() === now.getFullYear()) {
+      yearProfit += calculateNewVehicleProfit(v);
+    }
+  });
+  
+  // 月利润
+  let monthProfit = 0;
+  vehicles.forEach(v => {
+    const sellDate = new Date(v.sellDate);
+    if (sellDate.getFullYear() === now.getFullYear() && sellDate.getMonth() === now.getMonth()) {
+      monthProfit += calculateNewVehicleProfit(v);
+    }
+  });
+  
+  document.getElementById('newvehicle-finance').innerHTML = `
+    <div class="finance-item">
+      <div class="finance-label">总利润</div>
+      <div class="finance-value">¥${totalProfit.toFixed(2)}</div>
+    </div>
+    <div class="finance-item">
+      <div class="finance-label">年利润</div>
+      <div class="finance-value">¥${yearProfit.toFixed(2)}</div>
+    </div>
+    <div class="finance-item">
+      <div class="finance-label">月利润</div>
+      <div class="finance-value">¥${monthProfit.toFixed(2)}</div>
+    </div>
+  `;
+}
+
+// 计算单车利润
+function calculateNewVehicleProfit(vehicle) {
+  let profit = parseFloat(vehicle.sellProfit || 0);
+  
+  // 加上额外营收
+  if (vehicle.revenues) {
+    vehicle.revenues.forEach(r => profit += parseFloat(r.amount || 0));
+  }
+  
+  // 减去额外支出
+  if (vehicle.expenses) {
+    vehicle.expenses.forEach(e => profit -= parseFloat(e.amount || 0));
+  }
+  
+  return profit;
+}
+
+// 渲染新车列表
+function renderNewVehicleList() {
+  const vehicles = getNewVehicles();
+  
+  const listHtml = vehicles.map(v => {
+    const profit = calculateNewVehicleProfit(v);
+    
+    return `
+      <div class="vehicle-card" style="border-left: 4px solid #4CAF50;">
+        <div class="vehicle-name">订单: ${v.orderNo || v.id}</div>
+        <div class="vehicle-info">出售日期: ${v.sellDate || '-'}</div>
+        <div class="vehicle-info">利润: ¥${profit.toFixed(2)}</div>
+        <div class="vehicle-info">客户: ${v.customerPhone || '-'}</div>
+        <div class="vehicle-actions">
+          <button class="action-btn" onclick="showNewVehicleDetail('${v.id}', 'view')">查看</button>
+          <button class="action-btn" onclick="showNewVehicleDetail('${v.id}', 'edit')">编辑</button>
+          <button class="action-btn" onclick="deleteNewVehicle('${v.id}')">删除</button>
+        </div>
+      </div>
+    `;
+  }).join('');
+  
+  document.getElementById('newvehicle-list').innerHTML = listHtml || '<div style="text-align:center;padding:40px;color:#999;">暂无销售记录</div>';
+}
+
+// 显示新车详情
+function showNewVehicleDetail(id, mode) {
+  const vehicles = getNewVehicles();
+  const vehicle = id ? vehicles.find(v => v.id === id) : null;
+  const isNew = !id;
+  const isView = mode === 'view';
+  
+  document.getElementById('newvehicle-detail-title').textContent = isNew ? '新增销售记录' : (isView ? '销售详情' : '编辑销售记录');
+  
+  const profit = vehicle ? calculateNewVehicleProfit(vehicle) : 0;
+  
+  let html = `
+    <div class="detail-section">
+      <div class="section-title">基本信息</div>
+      <div class="form-row">
+        <label class="form-label">订单编号</label>
+        <input type="text" class="form-input" value="${vehicle ? vehicle.orderNo : generateOrderNo()}" disabled style="background:#f5f5f5;">
+        ${!vehicle ? '<div class="hint-text">订单编号自动生成，格式：yyyyMMdd+4位流水</div>' : ''}
+      </div>
+      <div class="form-row">
+        <label class="form-label">出售日期 <span class="required-star">*</span></label>
+        <input type="date" class="form-input" id="nv-sell-date" value="${vehicle ? vehicle.sellDate : new Date().toISOString().split('T')[0]}" ${isView ? 'disabled' : ''}>
+      </div>
+      <div class="form-row">
+        <label class="form-label">卖车利润 <span class="required-star">*</span></label>
+        <input type="number" class="form-input" id="nv-sell-profit" value="${vehicle ? vehicle.sellProfit : ''}" ${isView ? 'disabled' : ''} placeholder="请输入卖车利润">
+      </div>
+      <div class="form-row">
+        <label class="form-label">车架号</label>
+        <input type="text" class="form-input" id="nv-frame-no" value="${vehicle ? vehicle.frameNo : ''}" ${isView ? 'disabled' : ''} placeholder="请输入车架号">
+      </div>
+      <div class="form-row">
+        <label class="form-label">客户手机号 <span class="required-star">*</span></label>
+        <input type="tel" class="form-input" id="nv-customer-phone" value="${vehicle ? vehicle.customerPhone : ''}" ${isView ? 'disabled' : ''} placeholder="请输入11位手机号" maxlength="11">
+      </div>
+      <div class="form-row">
+        <label class="form-label">备注</label>
+        <textarea class="form-input" id="nv-remark" ${isView ? 'disabled' : ''} rows="3" placeholder="请输入备注">${vehicle ? vehicle.remark : ''}</textarea>
+      </div>
+    </div>
+    
+    ${vehicle && isView ? `
+    <div class="detail-section">
+      <div class="section-title">利润分析</div>
+      <div class="profit-analysis">
+        <div class="profit-row"><span>卖车利润:</span><span>¥${(vehicle.sellProfit || 0).toFixed(2)}</span></div>
+        <div class="profit-row"><span>额外营收:</span><span>¥${(vehicle.revenues || []).reduce((sum, r) => sum + (r.amount || 0), 0).toFixed(2)}</span></div>
+        <div class="profit-row"><span>额外支出:</span><span>-¥${(vehicle.expenses || []).reduce((sum, e) => sum + (e.amount || 0), 0).toFixed(2)}</span></div>
+        <div class="profit-row total"><span>总利润:</span><span>¥${profit.toFixed(2)}</span></div>
+      </div>
+    </div>
+    ` : ''}
+    
+    <div class="detail-section">
+      <div class="section-title">额外支出 ${!isView ? '<button class="add-row-btn" onclick="addExpenseRow()">+ 添加</button>' : ''}</div>
+      <table class="sub-table">
+        <thead>
+          <tr><th>支出名称 <span class="required-star">*</span></th><th>支出金额 <span class="required-star">*</span></th><th>备注</th>${!isView ? '<th></th>' : ''}</tr>
+        </thead>
+        <tbody id="expenses-tbody">
+          ${vehicle && vehicle.expenses ? vehicle.expenses.map((e, i) => renderExpenseRow(e, i, isView)).join('') : ''}
+        </tbody>
+      </table>
+    </div>
+    
+    <div class="detail-section">
+      <div class="section-title">额外营收 ${!isView ? '<button class="add-row-btn" onclick="addRevenueRow()">+ 添加</button>' : ''}</div>
+      <table class="sub-table">
+        <thead>
+          <tr><th>营收名称 <span class="required-star">*</span></th><th>营收金额 <span class="required-star">*</span></th><th>备注</th>${!isView ? '<th></th>' : ''}</tr>
+        </thead>
+        <tbody id="revenues-tbody">
+          ${vehicle && vehicle.revenues ? vehicle.revenues.map((r, i) => renderRevenueRow(r, i, isView)).join('') : ''}
+        </tbody>
+      </table>
+    </div>
+    
+    ${!isView ? `
+    <div class="btn-group">
+      <button class="btn-save" onclick="saveNewVehicle('${id || ''}')">保存</button>
+      <button class="btn-cancel" onclick="showPage('newvehicle'); initNewVehiclePage();">取消</button>
+    </div>
+    ` : ''}
+  `;
+  
+  document.getElementById('newvehicle-detail-content').innerHTML = html;
+  showPage('newvehicle-detail');
+}
+
+// 渲染支出行
+function renderExpenseRow(expense, index, isView) {
+  return `
+    <tr>
+      <td><input type="text" value="${expense.expenseName || ''}" data-field="expenseName" data-index="${index}" ${isView ? 'disabled' : ''}></td>
+      <td><input type="number" value="${expense.amount || ''}" data-field="amount" data-index="${index}" ${isView ? 'disabled' : ''}></td>
+      <td><input type="text" value="${expense.remark || ''}" data-field="remark" data-index="${index}" ${isView ? 'disabled' : ''}></td>
+      ${!isView ? `<td><span class="delete-row" onclick="this.parentElement.parentElement.remove()">×</span></td>` : ''}
+    </tr>
+  `;
+}
+
+// 渲染营收行
+function renderRevenueRow(revenue, index, isView) {
+  return `
+    <tr>
+      <td><input type="text" value="${revenue.revenueName || ''}" data-field="revenueName" data-index="${index}" ${isView ? 'disabled' : ''}></td>
+      <td><input type="number" value="${revenue.amount || ''}" data-field="amount" data-index="${index}" ${isView ? 'disabled' : ''}></td>
+      <td><input type="text" value="${revenue.remark || ''}" data-field="remark" data-index="${index}" ${isView ? 'disabled' : ''}></td>
+      ${!isView ? `<td><span class="delete-row" onclick="this.parentElement.parentElement.remove()">×</span></td>` : ''}
+    </tr>
+  `;
+}
+
+// 添加支出行
+function addExpenseRow() {
+  const tbody = document.getElementById('expenses-tbody');
+  const index = tbody.children.length;
+  tbody.insertAdjacentHTML('beforeend', renderExpenseRow({}, index, false));
+}
+
+// 添加营收行
+function addRevenueRow() {
+  const tbody = document.getElementById('revenues-tbody');
+  const index = tbody.children.length;
+  tbody.insertAdjacentHTML('beforeend', renderRevenueRow({}, index, false));
+}
+
+// 保存新车
+function saveNewVehicle(id) {
+  const sellDate = document.getElementById('nv-sell-date').value;
+  const sellProfit = document.getElementById('nv-sell-profit').value;
+  const frameNo = document.getElementById('nv-frame-no').value.trim();
+  const customerPhone = document.getElementById('nv-customer-phone').value.trim();
+  const remark = document.getElementById('nv-remark').value.trim();
+  
+  // 验证
+  if (!sellDate) return showToast('请选择出售日期');
+  if (!sellProfit) return showToast('请输入卖车利润');
+  if (!customerPhone) return showToast('请输入客户手机号');
+  if (!/^1[3-9]\d{9}$/.test(customerPhone)) return showToast('请输入正确的11位手机号');
+  
+  const vehicles = getNewVehicles();
+  
+  // 收集支出信息
+  const expenses = [];
+  document.querySelectorAll('#expenses-tbody tr').forEach(row => {
+    const inputs = row.querySelectorAll('input');
+    if (inputs.length >= 2 && inputs[0].value && inputs[1].value) {
+      expenses.push({
+        expenseName: inputs[0].value,
+        amount: parseFloat(inputs[1].value),
+        remark: inputs[2] ? inputs[2].value : ''
+      });
+    }
+  });
+  
+  // 收集营收信息
+  const revenues = [];
+  document.querySelectorAll('#revenues-tbody tr').forEach(row => {
+    const inputs = row.querySelectorAll('input');
+    if (inputs.length >= 2 && inputs[0].value && inputs[1].value) {
+      revenues.push({
+        revenueName: inputs[0].value,
+        amount: parseFloat(inputs[1].value),
+        remark: inputs[2] ? inputs[2].value : ''
+      });
+    }
+  });
+  
+  const vehicleData = {
+    id: id || Date.now().toString(),
+    orderNo: id ? vehicles.find(v => v.id === id).orderNo : generateOrderNo(),
+    sellDate,
+    sellProfit: parseFloat(sellProfit),
+    frameNo,
+    customerPhone,
+    remark,
+    expenses,
+    revenues,
+    createTime: id ? vehicles.find(v => v.id === id).createTime : new Date().toISOString(),
+    updateTime: new Date().toISOString()
+  };
+  
+  if (id) {
+    const index = vehicles.findIndex(v => v.id === id);
+    vehicles[index] = vehicleData;
+  } else {
+    vehicles.push(vehicleData);
+  }
+  
+  saveNewVehicles(vehicles);
+  showToast('保存成功');
+  showPage('newvehicle');
+  initNewVehiclePage();
+}
+
+// 生成订单编号
+function generateOrderNo() {
+  const today = new Date();
+  const year = today.getFullYear();
+  const month = String(today.getMonth() + 1).padStart(2, '0');
+  const day = String(today.getDate()).padStart(2, '0');
+  const dateStr = `${year}${month}${day}`;
+  
+  const vehicles = getNewVehicles();
+  const todayVehicles = vehicles.filter(v => v.orderNo && v.orderNo.startsWith(dateStr));
+  const serialNo = String(todayVehicles.length + 1).padStart(4, '0');
+  
+  return `${dateStr}${serialNo}`;
+}
+
+// 删除新车
+function deleteNewVehicle(id) {
+  if (!confirm('确定要删除这条销售记录吗？')) return;
+  
+  const vehicles = getNewVehicles();
+  const index = vehicles.findIndex(v => v.id === id);
+  if (index > -1) {
+    vehicles.splice(index, 1);
+    saveNewVehicles(vehicles);
+    showToast('删除成功');
+    initNewVehiclePage();
   }
 }
 
