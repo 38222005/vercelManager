@@ -27,7 +27,7 @@
     .toast { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: rgba(0,0,0,0.8); color: white; padding: 16px 32px; border-radius: 8px; z-index: 1000; }
     
     /* 租赁页面专用样式 */
-    .rental-header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 16px 24px; display: flex; justify-content: space-between; align-items: center; }
+    .rental-header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 16px 24px; display: flex; justify-content: flex-start; align-items: center; }
     .rental-stats { display: flex; gap: 12px; flex-wrap: wrap; }
     .rental-stat-item { background: rgba(255,255,255,0.2); padding: 6px 12px; border-radius: 8px; color: white; font-size: 12px; }
     
@@ -89,6 +89,10 @@
     
     .required-star { color: #dc3545; }
     .hint-text { font-size: 11px; color: #dc3545; margin-top: 4px; }
+    
+    .card-income { border-left: 4px solid #4CAF50; }
+    .card-expense { border-left: 4px solid #F44336; }
+    .card-mixed { border-left: 4px solid #9C27B0; }
   </style>
 </head>
 <body>
@@ -152,7 +156,6 @@
 <!-- 二手页面 -->
 <div id="page-rental" class="page">
   <div class="rental-header">
-    <h1 style="font-size:20px;font-weight:bold;color:white;">二手、租赁管理</h1>
     <div class="rental-stats" id="rental-stats"></div>
   </div>
   
@@ -196,7 +199,6 @@
 <!-- 维修页面 -->
 <div id="page-maintenance" class="page">
   <div class="rental-header">
-    <h1 style="font-size:20px;font-weight:bold;color:white;">维修服务</h1>
     <div class="rental-stats" id="maintenance-stats"></div>
   </div>
   
@@ -225,7 +227,6 @@
 <!-- 新车页面 -->
 <div id="page-newvehicle" class="page">
   <div class="rental-header">
-    <h1 style="font-size:20px;font-weight:bold;color:white;">新车销售管理</h1>
     <div class="rental-stats" id="newvehicle-stats"></div>
   </div>
   
@@ -260,11 +261,27 @@
 
 <!-- 其他页面 -->
 <div id="page-other" class="page">
-  <div class="gradient-bg" style="padding:24px;"><h1 style="font-size:24px;font-weight:bold;color:white;">其他</h1></div>
-  <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding:80px 16px;">
-    <div style="font-size:60px;margin-bottom:16px;opacity:0.5;">⋯</div>
-    <p style="color:#999;">暂无更多功能</p>
+  <!-- 统计模块（两排六个） -->
+  <div class="finance-grid" id="other-finance-income" style="grid-template-columns: repeat(3, 1fr);"></div>
+  <div class="finance-grid" id="other-finance-expense" style="grid-template-columns: repeat(3, 1fr);"></div>
+  
+  <!-- 收支记录列表 -->
+  <div id="other-list"></div>
+  
+  <!-- 新增按钮 -->
+  <div class="add-btn" onclick="showOtherDetail()">
+    <span>+</span>
   </div>
+</div>
+
+<!-- 收支详情页面 -->
+<div id="page-other-detail" class="page">
+  <div class="detail-header">
+    <div class="back-btn" onclick="showPage('other'); initOtherPage();">←</div>
+    <h1 style="font-size:18px;font-weight:bold;color:white;">收支详情</h1>
+  </div>
+  
+  <div id="other-detail-content"></div>
 </div>
 
 <!-- 底部 TabBar -->
@@ -378,6 +395,7 @@ function switchTab(key, el) {
   if (key === 'rental') initRentalPage();
   if (key === 'newvehicle') initNewVehiclePage();
   if (key === 'maintenance') initMaintenancePage();
+  if (key === 'other') initOtherPage();
 }
 
 function updateDate() {
@@ -1667,6 +1685,284 @@ function deleteMaintenanceRecord(id) {
     saveMaintenanceRecords(records);
     showToast('删除成功');
     initMaintenancePage();
+  }
+}
+
+// ========== 收支管理模块 ==========
+const OTHER_STORAGE_KEY = 'evb_other_records';
+
+function getOtherRecords() {
+  return STORAGE.get(OTHER_STORAGE_KEY) || [];
+}
+
+function saveOtherRecords(records) {
+  STORAGE.set(OTHER_STORAGE_KEY, records);
+}
+
+function initOtherPage() {
+  updateOtherFinance();
+  renderOtherList();
+}
+
+function updateOtherFinance() {
+  const records = getOtherRecords();
+  const now = new Date();
+  
+  let yearIncome = 0, monthIncome = 0, dayIncome = 0;
+  records.forEach(r => {
+    const billDate = new Date(r.billDate);
+    const incomeSum = (r.incomes || []).reduce((sum, i) => sum + (i.amount || 0), 0);
+    
+    if (billDate.getFullYear() === now.getFullYear()) {
+      yearIncome += incomeSum;
+      if (billDate.getMonth() === now.getMonth()) {
+        monthIncome += incomeSum;
+        if (billDate.getDate() === now.getDate()) {
+          dayIncome += incomeSum;
+        }
+      }
+    }
+  });
+  
+  let yearExpense = 0, monthExpense = 0, dayExpense = 0;
+  records.forEach(r => {
+    const billDate = new Date(r.billDate);
+    const expenseSum = (r.expenses || []).reduce((sum, e) => sum + (e.amount || 0), 0);
+    
+    if (billDate.getFullYear() === now.getFullYear()) {
+      yearExpense += expenseSum;
+      if (billDate.getMonth() === now.getMonth()) {
+        monthExpense += expenseSum;
+        if (billDate.getDate() === now.getDate()) {
+          dayExpense += expenseSum;
+        }
+      }
+    }
+  });
+  
+  document.getElementById('other-finance-income').innerHTML = `
+    <div class="finance-item">
+      <div class="finance-label">年收入</div>
+      <div class="finance-value">¥${yearIncome.toFixed(2)}</div>
+    </div>
+    <div class="finance-item">
+      <div class="finance-label">月收入</div>
+      <div class="finance-value">¥${monthIncome.toFixed(2)}</div>
+    </div>
+    <div class="finance-item">
+      <div class="finance-label">日收入</div>
+      <div class="finance-value">¥${dayIncome.toFixed(2)}</div>
+    </div>
+  `;
+  
+  document.getElementById('other-finance-expense').innerHTML = `
+    <div class="finance-item">
+      <div class="finance-label">年支出</div>
+      <div class="finance-value">¥${yearExpense.toFixed(2)}</div>
+    </div>
+    <div class="finance-item">
+      <div class="finance-label">月支出</div>
+      <div class="finance-value">¥${monthExpense.toFixed(2)}</div>
+    </div>
+    <div class="finance-item">
+      <div class="finance-label">日支出</div>
+      <div class="finance-value">¥${dayExpense.toFixed(2)}</div>
+    </div>
+  `;
+}
+
+function renderOtherList() {
+  const records = getOtherRecords();
+  
+  const listHtml = records.map(r => {
+    const incomeSum = (r.incomes || []).reduce((sum, i) => sum + (i.amount || 0), 0);
+    const expenseSum = (r.expenses || []).reduce((sum, e) => sum + (e.amount || 0), 0);
+    
+    let cardClass = 'card-mixed';
+    if (incomeSum > 0 && expenseSum === 0) cardClass = 'card-income';
+    else if (expenseSum > 0 && incomeSum === 0) cardClass = 'card-expense';
+    
+    return `
+      <div class="vehicle-card ${cardClass}">
+        <div class="vehicle-name">单据日期: ${r.billDate || '-'}</div>
+        <div class="vehicle-info">收入: ¥${incomeSum.toFixed(2)}</div>
+        <div class="vehicle-info">支出: ¥${expenseSum.toFixed(2)}</div>
+        <div class="vehicle-actions">
+          <button class="action-btn" onclick="showOtherDetail('${r.id}', 'view')">查看</button>
+          <button class="action-btn" onclick="showOtherDetail('${r.id}', 'edit')">编辑</button>
+          <button class="action-btn" onclick="deleteOtherRecord('${r.id}')">删除</button>
+        </div>
+      </div>
+    `;
+  }).join('');
+  
+  document.getElementById('other-list').innerHTML = listHtml || '<div style="text-align:center;padding:40px;color:#999;">暂无收支记录</div>';
+}
+
+function showOtherDetail(id, mode) {
+  const records = getOtherRecords();
+  const record = id ? records.find(r => r.id === id) : null;
+  const isView = mode === 'view';
+  
+  const incomeSum = record ? (record.incomes || []).reduce((sum, i) => sum + (i.amount || 0), 0) : 0;
+  const expenseSum = record ? (record.expenses || []).reduce((sum, e) => sum + (e.amount || 0), 0) : 0;
+  
+  let html = `
+    <div class="detail-section">
+      <div class="section-title">基本信息</div>
+      <div class="form-row">
+        <label class="form-label">单据日期 <span class="required-star">*</span></label>
+        <input type="date" class="form-input" id="ot-bill-date" value="${record ? record.billDate : new Date().toISOString().split('T')[0]}" ${isView ? 'disabled' : ''}>
+      </div>
+      <div class="form-row">
+        <label class="form-label">备注</label>
+        <textarea class="form-input" id="ot-remark" ${isView ? 'disabled' : ''} rows="3" placeholder="请输入备注">${record ? record.remark : ''}</textarea>
+      </div>
+    </div>
+    
+    ${record && isView ? `
+    <div class="detail-section">
+      <div class="section-title">收支汇总</div>
+      <div class="profit-analysis">
+        <div class="profit-row"><span>收入总额:</span><span>¥${incomeSum.toFixed(2)}</span></div>
+        <div class="profit-row"><span>支出总额:</span><span>-¥${expenseSum.toFixed(2)}</span></div>
+      </div>
+    </div>
+    ` : ''}
+    
+    <div class="detail-section">
+      <div class="section-title">收入明细 ${!isView ? '<button class="add-row-btn" onclick="addOtherIncomeRow()">+ 添加</button>' : ''}</div>
+      <table class="sub-table">
+        <thead>
+          <tr><th>收入名称 <span class="required-star">*</span></th><th>收入金额 <span class="required-star">*</span></th><th>备注</th>${!isView ? '<th></th>' : ''}</tr>
+        </thead>
+        <tbody id="ot-incomes-tbody">
+          ${record && record.incomes ? record.incomes.map((i, idx) => renderOtherIncomeRow(i, idx, isView)).join('') : ''}
+        </tbody>
+      </table>
+    </div>
+    
+    <div class="detail-section">
+      <div class="section-title">支出明细 ${!isView ? '<button class="add-row-btn" onclick="addOtherExpenseRow()">+ 添加</button>' : ''}</div>
+      <table class="sub-table">
+        <thead>
+          <tr><th>支出名称 <span class="required-star">*</span></th><th>支出金额 <span class="required-star">*</span></th><th>备注</th>${!isView ? '<th></th>' : ''}</tr>
+        </thead>
+        <tbody id="ot-expenses-tbody">
+          ${record && record.expenses ? record.expenses.map((e, idx) => renderOtherExpenseRow(e, idx, isView)).join('') : ''}
+        </tbody>
+      </table>
+    </div>
+    
+    ${!isView ? `
+    <div class="btn-group">
+      <button class="btn-save" onclick="saveOtherRecord('${id || ''}')">保存</button>
+      <button class="btn-cancel" onclick="showPage('other'); initOtherPage();">取消</button>
+    </div>
+    ` : ''}
+  `;
+  
+  document.getElementById('other-detail-content').innerHTML = html;
+  showPage('other-detail');
+}
+
+function renderOtherIncomeRow(item, index, isView) {
+  return `
+    <tr>
+      <td><input type="text" value="${item.incomeName || ''}" ${isView ? 'disabled' : ''}></td>
+      <td><input type="number" value="${item.amount || ''}" ${isView ? 'disabled' : ''}></td>
+      <td><input type="text" value="${item.remark || ''}" ${isView ? 'disabled' : ''}></td>
+      ${!isView ? `<td><span class="delete-row" onclick="this.parentElement.parentElement.remove()">×</span></td>` : ''}
+    </tr>
+  `;
+}
+
+function renderOtherExpenseRow(item, index, isView) {
+  return `
+    <tr>
+      <td><input type="text" value="${item.expenseName || ''}" ${isView ? 'disabled' : ''}></td>
+      <td><input type="number" value="${item.amount || ''}" ${isView ? 'disabled' : ''}></td>
+      <td><input type="text" value="${item.remark || ''}" ${isView ? 'disabled' : ''}></td>
+      ${!isView ? `<td><span class="delete-row" onclick="this.parentElement.parentElement.remove()">×</span></td>` : ''}
+    </tr>
+  `;
+}
+
+function addOtherIncomeRow() {
+  const tbody = document.getElementById('ot-incomes-tbody');
+  tbody.insertAdjacentHTML('beforeend', renderOtherIncomeRow({}, tbody.children.length, false));
+}
+
+function addOtherExpenseRow() {
+  const tbody = document.getElementById('ot-expenses-tbody');
+  tbody.insertAdjacentHTML('beforeend', renderOtherExpenseRow({}, tbody.children.length, false));
+}
+
+function saveOtherRecord(id) {
+  const billDate = document.getElementById('ot-bill-date').value;
+  const remark = document.getElementById('ot-remark').value.trim();
+  
+  if (!billDate) return showToast('请选择单据日期');
+  
+  const records = getOtherRecords();
+  
+  const incomes = [];
+  document.querySelectorAll('#ot-incomes-tbody tr').forEach(row => {
+    const inputs = row.querySelectorAll('input');
+    if (inputs.length >= 2 && inputs[0].value && inputs[1].value) {
+      incomes.push({
+        incomeName: inputs[0].value,
+        amount: parseFloat(inputs[1].value),
+        remark: inputs[2] ? inputs[2].value : ''
+      });
+    }
+  });
+  
+  const expenses = [];
+  document.querySelectorAll('#ot-expenses-tbody tr').forEach(row => {
+    const inputs = row.querySelectorAll('input');
+    if (inputs.length >= 2 && inputs[0].value && inputs[1].value) {
+      expenses.push({
+        expenseName: inputs[0].value,
+        amount: parseFloat(inputs[1].value),
+        remark: inputs[2] ? inputs[2].value : ''
+      });
+    }
+  });
+  
+  const recordData = {
+    id: id || Date.now().toString(),
+    billDate,
+    remark,
+    incomes,
+    expenses,
+    createTime: id ? records.find(r => r.id === id).createTime : new Date().toISOString(),
+    updateTime: new Date().toISOString()
+  };
+  
+  if (id) {
+    const index = records.findIndex(r => r.id === id);
+    records[index] = recordData;
+  } else {
+    records.push(recordData);
+  }
+  
+  saveOtherRecords(records);
+  showToast('保存成功');
+  showPage('other');
+  initOtherPage();
+}
+
+function deleteOtherRecord(id) {
+  if (!confirm('确定要删除这条收支记录吗？')) return;
+  
+  const records = getOtherRecords();
+  const index = records.findIndex(r => r.id === id);
+  if (index > -1) {
+    records.splice(index, 1);
+    saveOtherRecords(records);
+    showToast('删除成功');
+    initOtherPage();
   }
 }
 
