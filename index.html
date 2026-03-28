@@ -207,10 +207,19 @@
     <div class="home-menu-item" onclick="gotoModules(); toggleHomeMenu();">
       <span class="home-menu-icon">⚙️</span>模块管理
     </div>
+    <div class="home-menu-item" onclick="exportData(); toggleHomeMenu();">
+      <span class="home-menu-icon">📤</span>导出数据
+    </div>
+    <div class="home-menu-item" onclick="document.getElementById('import-file').click(); toggleHomeMenu();">
+      <span class="home-menu-icon">📥</span>导入数据
+    </div>
     <div class="home-menu-item" onclick="showAbout(); toggleHomeMenu();">
       <span class="home-menu-icon">📱</span>关于我们
     </div>
   </div>
+  
+  <!-- 隐藏的文件选择器 -->
+  <input type="file" id="import-file" accept=".json" style="display:none;" onchange="importData(this)">
 </div>
 
 <!-- 二手页面 -->
@@ -555,6 +564,98 @@ function showAbout() {
 function toggleHomeMenu() {
   const menu = document.getElementById('home-menu');
   menu.style.display = menu.style.display === 'none' ? 'block' : 'none';
+}
+
+function exportData() {
+  const exportData = {
+    version: '1.0',
+    exportTime: new Date().toISOString(),
+    appName: '电动车管家',
+    data: {
+      vehicles: getVehicles(),
+      newVehicles: getNewVehicles(),
+      maintenanceRecords: getMaintenanceRecords(),
+      otherRecords: getOtherRecords()
+    }
+  };
+  
+  const jsonStr = JSON.stringify(exportData, null, 2);
+  const blob = new Blob([jsonStr], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `电动车管家_数据备份_${new Date().toISOString().slice(0, 10)}.json`;
+  a.click();
+  
+  URL.revokeObjectURL(url);
+  showToast('数据导出成功');
+}
+
+function importData(input) {
+  const file = input.files[0];
+  if (!file) return;
+  
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    try {
+      const data = JSON.parse(e.target.result);
+      
+      if (!data.version || !data.data) {
+        showToast('文件格式不正确');
+        input.value = '';
+        return;
+      }
+      
+      if (!confirm('导入数据将合并到当前数据中，相同ID的记录会被覆盖，确定继续吗？')) {
+        input.value = '';
+        return;
+      }
+      
+      if (data.data.vehicles) {
+        const existing = getVehicles();
+        saveVehicles(mergeData(existing, data.data.vehicles));
+      }
+      
+      if (data.data.newVehicles) {
+        const existing = getNewVehicles();
+        saveNewVehicles(mergeData(existing, data.data.newVehicles));
+      }
+      
+      if (data.data.maintenanceRecords) {
+        const existing = getMaintenanceRecords();
+        saveMaintenanceRecords(mergeData(existing, data.data.maintenanceRecords));
+      }
+      
+      if (data.data.otherRecords) {
+        const existing = getOtherRecords();
+        saveOtherRecords(mergeData(existing, data.data.otherRecords));
+      }
+      
+      showToast('数据导入成功，正在刷新页面...');
+      setTimeout(() => location.reload(), 1000);
+      
+    } catch (err) {
+      showToast('文件解析失败: ' + err.message);
+    }
+  };
+  reader.readAsText(file);
+  input.value = '';
+}
+
+function mergeData(existingRecords, newRecords) {
+  const merged = [...existingRecords];
+  
+  newRecords.forEach(newRecord => {
+    const existingIndex = merged.findIndex(r => r.id === newRecord.id);
+    if (existingIndex >= 0) {
+      merged[existingIndex] = newRecord;
+    } else {
+      merged.push(newRecord);
+    }
+  });
+  
+  return merged;
 }
 
 let dragState = { isDragging: false, startX: 0, startY: 0, startLeft: 0, startTop: 0, moveDistance: 0 };
