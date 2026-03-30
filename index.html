@@ -3,8 +3,15 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="theme-color" content="#667eea">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="电动车管家">
+  <meta name="mobile-web-app-capable" content="yes">
+  <link rel="manifest" href="manifest.json">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
   <title>电动车管家</title>
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="lib/chart.umd.js"></script>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #F8F8F8; }
@@ -2790,6 +2797,19 @@ function deleteOtherRecord(id) {
   renderModules();
   initDraggableButton();
 })();
+
+// PWA Service Worker 注册
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', function() {
+    navigator.serviceWorker.register('./sw.js')
+      .then(function(registration) {
+        console.log('ServiceWorker 注册成功:', registration.scope);
+      })
+      .catch(function(error) {
+        console.log('ServiceWorker 注册失败:', error);
+      });
+  });
+}
 </script>
 </body>
 </html>
