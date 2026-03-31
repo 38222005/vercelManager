@@ -85,6 +85,8 @@
     .sub-table th, .sub-table td { padding: 8px; border: 1px solid #eee; text-align: left; font-size: 12px; }
     .sub-table th { background: #f8f8f8; font-weight: bold; }
     .sub-table td input { width: 100%; padding: 4px 8px; border: 1px solid #ddd; border-radius: 4px; font-size: 12px; }
+    .rental-table .rental-field-label { font-size: 11px; color: #666; margin-bottom: 4px; font-weight: 500; }
+    .rental-table .rental-action-cell { vertical-align: middle; text-align: center; }
     .delete-row { color: #dc3545; cursor: pointer; font-size: 16px; }
     .add-row-btn { margin-top: 8px; padding: 6px 12px; background: #28a745; color: white; border: none; border-radius: 6px; font-size: 12px; cursor: pointer; }
     
@@ -819,13 +821,6 @@ function calculateDayProfit(dateStr) {
         rentalProfit += parseFloat(r.rent || 0);
       }
     });
-    if (v.isSold === '是' && v.sellDate) {
-      const d = new Date(v.sellDate);
-      if (d.toDateString() === targetDate.toDateString()) {
-        rentalProfit += parseFloat(v.sellPrice || 0) - parseFloat(v.purchasePrice || 0);
-        if (v.costs) v.costs.forEach(c => rentalProfit -= parseFloat(c.amount || 0));
-      }
-    }
     (v.otherProfits || []).forEach(o => {
       const d = new Date(o.date);
       if (d.toDateString() === targetDate.toDateString()) {
@@ -938,13 +933,6 @@ function calculateMonthDailyProfit(year, month) {
           rentalProfit += parseFloat(r.rent || 0);
         }
       });
-      if (v.isSold === '是' && v.sellDate) {
-        const d = new Date(v.sellDate);
-        if (d.toDateString() === targetDate.toDateString()) {
-          rentalProfit += parseFloat(v.sellPrice || 0) - parseFloat(v.purchasePrice || 0);
-          if (v.costs) v.costs.forEach(c => rentalProfit -= parseFloat(c.amount || 0));
-        }
-      }
       (v.otherProfits || []).forEach(o => {
         const d = new Date(o.date);
         if (d.toDateString() === targetDate.toDateString()) {
@@ -1058,7 +1046,6 @@ function getAvailableYears() {
   years.add(currentYear);
   
   getVehicles().forEach(v => {
-    if (v.sellDate) years.add(new Date(v.sellDate).getFullYear());
     (v.rentals || []).forEach(r => {
       if (r.startDate) years.add(new Date(r.startDate).getFullYear());
     });
@@ -1088,10 +1075,6 @@ function calculateYearProfit(year) {
         rentalProfit += parseFloat(r.rent || 0);
       }
     });
-    if (v.isSold === '是' && v.sellDate && new Date(v.sellDate).getFullYear() === year) {
-      rentalProfit += parseFloat(v.sellPrice || 0) - parseFloat(v.purchasePrice || 0);
-      if (v.costs) v.costs.forEach(c => rentalProfit -= parseFloat(c.amount || 0));
-    }
     (v.otherProfits || []).forEach(o => {
       if (o.date && new Date(o.date).getFullYear() === year) {
         rentalProfit += parseFloat(o.amount || 0);
@@ -1133,13 +1116,6 @@ function calculateMonthlyProfit(year) {
           rentalProfit += parseFloat(r.rent || 0);
         }
       });
-      if (v.isSold === '是' && v.sellDate) {
-        const d = new Date(v.sellDate);
-        if (d.getFullYear() === year && d.getMonth() === m) {
-          rentalProfit += parseFloat(v.sellPrice || 0) - parseFloat(v.purchasePrice || 0);
-          if (v.costs) v.costs.forEach(c => rentalProfit -= parseFloat(c.amount || 0));
-        }
-      }
       (v.otherProfits || []).forEach(o => {
         const d = new Date(o.date);
         if (d.getFullYear() === year && d.getMonth() === m) {
@@ -1316,14 +1292,6 @@ function calculateVehicleProfit(vehicle) {
     vehicle.otherProfits.forEach(o => profit += parseFloat(o.amount || 0));
   }
   
-  // 如果已出售
-  if (vehicle.isSold === '是') {
-    profit += parseFloat(vehicle.sellPrice || 0) - parseFloat(vehicle.purchasePrice || 0);
-    if (vehicle.costs) {
-      vehicle.costs.forEach(c => profit -= parseFloat(c.amount || 0));
-    }
-  }
-  
   return profit;
 }
 
@@ -1359,17 +1327,6 @@ function updateFinance() {
         }
       });
     }
-    // 已出售车辆的特殊计算
-    if (v.isSold === '是' && v.sellDate) {
-      const sellDate = new Date(v.sellDate);
-      if (sellDate.getFullYear() === now.getFullYear()) {
-        yearProfit += parseFloat(v.sellPrice || 0);
-        yearProfit -= parseFloat(v.purchasePrice || 0);
-        if (v.costs) {
-          v.costs.forEach(c => yearProfit -= parseFloat(c.amount || 0));
-        }
-      }
-    }
   });
   
   // 月利润计算
@@ -1395,43 +1352,6 @@ function updateFinance() {
         }
       });
     }
-    // 已出售车辆的特殊计算
-    if (v.isSold === '是' && v.sellDate) {
-      const sellDate = new Date(v.sellDate);
-      if (sellDate.getFullYear() === now.getFullYear() && sellDate.getMonth() === now.getMonth()) {
-        monthProfit += parseFloat(v.sellPrice || 0);
-        monthProfit -= parseFloat(v.purchasePrice || 0);
-        if (v.costs) {
-          v.costs.forEach(c => monthProfit -= parseFloat(c.amount || 0));
-        }
-      }
-    }
-  });
-  
-  // 总成本 = 所有车子收购价格 + 分录中成本信息业务金额
-  let totalCost = 0;
-  vehicles.forEach(v => {
-    totalCost += parseFloat(v.purchasePrice || 0);
-    if (v.costs) {
-      v.costs.forEach(c => totalCost += parseFloat(c.amount || 0));
-    }
-  });
-  
-  // 回归成本 = 出售的车子收购价格之和 + 分录中业务金额之和
-  let returnCost = 0;
-  vehicles.filter(v => v.isSold === '是').forEach(v => {
-    returnCost += parseFloat(v.purchasePrice || 0);
-    if (v.costs) {
-      v.costs.forEach(c => returnCost += parseFloat(c.amount || 0));
-    }
-  });
-  
-  // 押金 = 所有租赁记录的押金之和
-  let totalDeposit = 0;
-  vehicles.forEach(v => {
-    if (v.rentals) {
-      v.rentals.forEach(r => totalDeposit += parseFloat(r.deposit || 0));
-    }
   });
   
   document.getElementById('finance-grid').innerHTML = `
@@ -1446,18 +1366,6 @@ function updateFinance() {
     <div class="finance-item">
       <div class="finance-label">月利润</div>
       <div class="finance-value">¥${monthProfit.toFixed(2)}</div>
-    </div>
-    <div class="finance-item">
-      <div class="finance-label">总成本</div>
-      <div class="finance-value">¥${totalCost.toFixed(2)}</div>
-    </div>
-    <div class="finance-item">
-      <div class="finance-label">回归成本</div>
-      <div class="finance-value">¥${returnCost.toFixed(2)}</div>
-    </div>
-    <div class="finance-item">
-      <div class="finance-label">总押金</div>
-      <div class="finance-value">¥${totalDeposit.toFixed(2)}</div>
     </div>
   `;
 }
@@ -1609,14 +1517,6 @@ function showVehicleDetail(id, mode) {
           <option value="是" ${vehicle && vehicle.isSold === '是' ? 'selected' : ''}>是</option>
         </select>
       </div>
-      <div class="form-row sell-info-row" style="display:${vehicle && vehicle.isSold === '是' ? 'block' : 'none'}">
-        <label class="form-label">出售价格 <span class="required-star">*</span></label>
-        <input type="number" class="form-input" id="vehicle-sell-price" value="${vehicle && vehicle.sellPrice ? vehicle.sellPrice : ''}" ${isView ? 'disabled' : ''} placeholder="请输入出售价格">
-      </div>
-      <div class="form-row sell-info-row" style="display:${vehicle && vehicle.isSold === '是' ? 'block' : 'none'}">
-        <label class="form-label">出售日期 <span class="required-star">*</span></label>
-        <input type="date" class="form-input" id="vehicle-sell-date" value="${vehicle && vehicle.sellDate ? vehicle.sellDate : new Date().toISOString().split('T')[0]}" ${isView ? 'disabled' : ''}>
-      </div>
       <div class="form-row">
         <label class="form-label">电池大小 <span class="required-star">*</span></label>
         <input type="text" class="form-input" id="vehicle-battery-size" value="${vehicle ? vehicle.batterySize : '48v12ah'}" ${isView ? 'disabled' : ''} placeholder="例如: 48v12ah">
@@ -1650,10 +1550,7 @@ function showVehicleDetail(id, mode) {
     
     <div class="detail-section">
       <div class="section-title">租赁利润 ${!isView ? '<button class="add-row-btn" onclick="addRentalRow()">+ 添加</button>' : ''}</div>
-      <table class="sub-table">
-        <thead>
-          <tr><th>开始日期 <span class="required-star">*</span></th><th>截止日期 <span class="required-star">*</span></th><th>租金 <span class="required-star">*</span></th><th>押金</th><th>备注</th>${!isView ? '<th></th>' : ''}</tr>
-        </thead>
+      <table class="sub-table rental-table">
         <tbody id="rentals-tbody">
           ${vehicle && vehicle.rentals ? vehicle.rentals.map((r, i) => renderRentalRow(r, i, isView)).join('') : ''}
         </tbody>
@@ -1709,12 +1606,35 @@ function renderCostRow(cost, index, isView) {
 function renderRentalRow(rental, index, isView) {
   return `
     <tr>
-      <td><input type="date" value="${rental.startDate || ''}" data-field="startDate" data-index="${index}" ${isView ? 'disabled' : ''}></td>
-      <td><input type="date" value="${rental.endDate || ''}" data-field="endDate" data-index="${index}" ${isView ? 'disabled' : ''}></td>
-      <td><input type="number" value="${rental.rent || ''}" data-field="rent" data-index="${index}" ${isView ? 'disabled' : ''}></td>
-      <td><input type="number" value="${rental.deposit || ''}" data-field="deposit" data-index="${index}" ${isView ? 'disabled' : ''}></td>
-      <td><input type="text" value="${rental.remark || ''}" data-field="remark" data-index="${index}" ${isView ? 'disabled' : ''}></td>
-      ${!isView ? `<td><span class="delete-row" onclick="this.parentElement.parentElement.remove()">×</span></td>` : ''}
+      <td>
+        <div class="rental-field-label">开始日期 <span class="required-star">*</span></div>
+        <input type="date" value="${rental.startDate || ''}" data-field="startDate" data-index="${index}" ${isView ? 'disabled' : ''}>
+      </td>
+      <td>
+        <div class="rental-field-label">截止日期 <span class="required-star">*</span></div>
+        <input type="date" value="${rental.endDate || ''}" data-field="endDate" data-index="${index}" ${isView ? 'disabled' : ''}>
+      </td>
+      <td>
+        <div class="rental-field-label">租金 <span class="required-star">*</span></div>
+        <input type="number" value="${rental.rent || ''}" data-field="rent" data-index="${index}" ${isView ? 'disabled' : ''}>
+      </td>
+      <td>
+        <div class="rental-field-label">押金</div>
+        <input type="number" value="${rental.deposit || ''}" data-field="deposit" data-index="${index}" ${isView ? 'disabled' : ''}>
+      </td>
+    </tr>
+    <tr>
+      <td>
+        <div class="rental-field-label">客户联系方式</div>
+        <input type="text" value="${rental.customerPhone || ''}" data-field="customerPhone" data-index="${index}" ${isView ? 'disabled' : ''}>
+      </td>
+      <td colspan="2">
+        <div class="rental-field-label">备注</div>
+        <input type="text" value="${rental.remark || ''}" data-field="remark" data-index="${index}" ${isView ? 'disabled' : ''}>
+      </td>
+      <td class="rental-action-cell">
+        ${!isView ? `<span class="delete-row" onclick="deleteRentalRow(this)">×</span>` : ''}
+      </td>
     </tr>
   `;
 }
@@ -1748,6 +1668,14 @@ function addRentalRow() {
   tbody.insertAdjacentHTML('beforeend', renderRentalRow({}, index, false));
 }
 
+// 删除租赁行（删除两行）
+function deleteRentalRow(btn) {
+  const row2 = btn.closest('tr');
+  const row1 = row2.previousElementSibling;
+  if (row1) row1.remove();
+  row2.remove();
+}
+
 // 添加其他利润行
 function addOtherProfitRow() {
   const tbody = document.getElementById('other-profits-tbody');
@@ -1760,18 +1688,12 @@ function saveVehicle(id) {
   const name = document.getElementById('vehicle-name').value.trim();
   const purchasePrice = document.getElementById('vehicle-purchase-price').value;
   const isSold = document.getElementById('vehicle-is-sold').value;
-  const sellPrice = document.getElementById('vehicle-sell-price').value;
-  const sellDate = document.getElementById('vehicle-sell-date').value;
   const batterySize = document.getElementById('vehicle-battery-size').value.trim();
   const remark = document.getElementById('vehicle-remark').value.trim();
   
   // 验证
   if (!name) return showToast('请输入电动车名称');
   if (!purchasePrice) return showToast('请输入收购价格');
-  if (isSold === '是') {
-    if (!sellPrice) return showToast('请输入出售价格');
-    if (!sellDate) return showToast('请选择出售日期');
-  }
   if (!batterySize) return showToast('请输入电池大小');
   
   // 检查名称是否重复
@@ -1794,18 +1716,25 @@ function saveVehicle(id) {
   
   // 收集租赁利润
   const rentals = [];
-  document.querySelectorAll('#rentals-tbody tr').forEach(row => {
-    const inputs = row.querySelectorAll('input');
-    if (inputs.length >= 3 && inputs[0].value && inputs[1].value && inputs[2].value) {
-      rentals.push({
-        startDate: inputs[0].value,
-        endDate: inputs[1].value,
-        rent: parseFloat(inputs[2].value),
-        deposit: inputs[3] ? parseFloat(inputs[3].value) : 0,
-        remark: inputs[4] ? inputs[4].value : ''
-      });
+  const rentalRows = document.querySelectorAll('#rentals-tbody tr');
+  for (let i = 0; i < rentalRows.length; i += 2) {
+    const row1 = rentalRows[i];
+    const row2 = rentalRows[i + 1];
+    if (row1 && row2) {
+      const inputs1 = row1.querySelectorAll('input');
+      const inputs2 = row2.querySelectorAll('input');
+      if (inputs1.length >= 3 && inputs1[0].value && inputs1[1].value && inputs1[2].value) {
+        rentals.push({
+          startDate: inputs1[0].value,
+          endDate: inputs1[1].value,
+          rent: parseFloat(inputs1[2].value),
+          deposit: inputs1[3] ? parseFloat(inputs1[3].value) : 0,
+          customerPhone: inputs2[0] ? inputs2[0].value : '',
+          remark: inputs2[1] ? inputs2[1].value : ''
+        });
+      }
     }
-  });
+  }
   
   // 收集其他利润
   const otherProfits = [];
@@ -1826,8 +1755,6 @@ function saveVehicle(id) {
     name,
     purchasePrice: parseFloat(purchasePrice),
     isSold,
-    sellPrice: isSold === '是' ? parseFloat(sellPrice) : null,
-    sellDate: isSold === '是' ? sellDate : null,
     batterySize,
     remark,
     costs,
