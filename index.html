@@ -827,6 +827,14 @@ function calculateDayProfit(dateStr) {
         rentalProfit += parseFloat(o.amount || 0);
       }
     });
+    (v.costs || []).forEach(c => {
+      if (c.businessDate) {
+        const d = new Date(c.businessDate);
+        if (d.toDateString() === targetDate.toDateString()) {
+          rentalProfit -= parseFloat(c.amount || 0);
+        }
+      }
+    });
   });
   
   getNewVehicles().forEach(v => {
@@ -939,6 +947,14 @@ function calculateMonthDailyProfit(year, month) {
           rentalProfit += parseFloat(o.amount || 0);
         }
       });
+      (v.costs || []).forEach(c => {
+        if (c.businessDate) {
+          const d = new Date(c.businessDate);
+          if (d.toDateString() === targetDate.toDateString()) {
+            rentalProfit -= parseFloat(c.amount || 0);
+          }
+        }
+      });
     });
     
     getNewVehicles().forEach(v => {
@@ -1049,6 +1065,12 @@ function getAvailableYears() {
     (v.rentals || []).forEach(r => {
       if (r.startDate) years.add(new Date(r.startDate).getFullYear());
     });
+    (v.costs || []).forEach(c => {
+      if (c.businessDate) years.add(new Date(c.businessDate).getFullYear());
+    });
+    (v.otherProfits || []).forEach(o => {
+      if (o.date) years.add(new Date(o.date).getFullYear());
+    });
   });
   
   getNewVehicles().forEach(v => {
@@ -1078,6 +1100,11 @@ function calculateYearProfit(year) {
     (v.otherProfits || []).forEach(o => {
       if (o.date && new Date(o.date).getFullYear() === year) {
         rentalProfit += parseFloat(o.amount || 0);
+      }
+    });
+    (v.costs || []).forEach(c => {
+      if (c.businessDate && new Date(c.businessDate).getFullYear() === year) {
+        rentalProfit -= parseFloat(c.amount || 0);
       }
     });
   });
@@ -1120,6 +1147,14 @@ function calculateMonthlyProfit(year) {
         const d = new Date(o.date);
         if (d.getFullYear() === year && d.getMonth() === m) {
           rentalProfit += parseFloat(o.amount || 0);
+        }
+      });
+      (v.costs || []).forEach(c => {
+        if (c.businessDate) {
+          const d = new Date(c.businessDate);
+          if (d.getFullYear() === year && d.getMonth() === m) {
+            rentalProfit -= parseFloat(c.amount || 0);
+          }
         }
       });
     });
@@ -1292,6 +1327,11 @@ function calculateVehicleProfit(vehicle) {
     vehicle.otherProfits.forEach(o => profit += parseFloat(o.amount || 0));
   }
   
+  // 减去成本
+  if (vehicle.costs) {
+    vehicle.costs.forEach(c => profit -= parseFloat(c.amount || 0));
+  }
+  
   return profit;
 }
 
@@ -1327,6 +1367,17 @@ function updateFinance() {
         }
       });
     }
+    // 成本（按业务日期）
+    if (v.costs) {
+      v.costs.forEach(c => {
+        if (c.businessDate) {
+          const costDate = new Date(c.businessDate);
+          if (costDate.getFullYear() === now.getFullYear()) {
+            yearProfit -= parseFloat(c.amount || 0);
+          }
+        }
+      });
+    }
   });
   
   // 月利润计算
@@ -1349,6 +1400,17 @@ function updateFinance() {
         const opDate = new Date(o.date || o.createTime);
         if (opDate.getFullYear() === now.getFullYear() && opDate.getMonth() === now.getMonth()) {
           monthProfit += parseFloat(o.amount || 0);
+        }
+      });
+    }
+    // 成本（按业务日期）
+    if (v.costs) {
+      v.costs.forEach(c => {
+        if (c.businessDate) {
+          const costDate = new Date(c.businessDate);
+          if (costDate.getFullYear() === now.getFullYear() && costDate.getMonth() === now.getMonth()) {
+            monthProfit -= parseFloat(c.amount || 0);
+          }
         }
       });
     }
@@ -1540,7 +1602,7 @@ function showVehicleDetail(id, mode) {
       <div class="section-title">成本信息 ${!isView ? '<button class="add-row-btn" onclick="addCostRow()">+ 添加</button>' : ''}</div>
       <table class="sub-table">
         <thead>
-          <tr><th>业务名称 <span class="required-star">*</span></th><th>业务金额 <span class="required-star">*</span></th><th>备注</th>${!isView ? '<th></th>' : ''}</tr>
+          <tr><th>业务日期 <span class="required-star">*</span></th><th>业务名称 <span class="required-star">*</span></th><th>业务金额 <span class="required-star">*</span></th><th>备注</th>${!isView ? '<th></th>' : ''}</tr>
         </thead>
         <tbody id="costs-tbody">
           ${vehicle && vehicle.costs ? vehicle.costs.map((c, i) => renderCostRow(c, i, isView)).join('') : ''}
@@ -1592,8 +1654,11 @@ function showVehicleDetail(id, mode) {
 
 // 渲染成本行
 function renderCostRow(cost, index, isView) {
+  const today = new Date().toISOString().split('T')[0];
+  const defaultDate = cost.businessDate || today;
   return `
     <tr>
+      <td><input type="date" value="${defaultDate}" data-field="businessDate" data-index="${index}" ${isView ? 'disabled' : ''}></td>
       <td><input type="text" value="${cost.businessName || ''}" data-field="businessName" data-index="${index}" ${isView ? 'disabled' : ''}></td>
       <td><input type="number" value="${cost.amount || ''}" data-field="amount" data-index="${index}" ${isView ? 'disabled' : ''}></td>
       <td><input type="text" value="${cost.remark || ''}" data-field="remark" data-index="${index}" ${isView ? 'disabled' : ''}></td>
@@ -1705,11 +1770,12 @@ function saveVehicle(id) {
   const costs = [];
   document.querySelectorAll('#costs-tbody tr').forEach(row => {
     const inputs = row.querySelectorAll('input');
-    if (inputs.length >= 2 && inputs[0].value && inputs[1].value) {
+    if (inputs.length >= 3 && inputs[0].value && inputs[1].value && inputs[2].value) {
       costs.push({
-        businessName: inputs[0].value,
-        amount: parseFloat(inputs[1].value),
-        remark: inputs[2] ? inputs[2].value : ''
+        businessDate: inputs[0].value,
+        businessName: inputs[1].value,
+        amount: parseFloat(inputs[2].value),
+        remark: inputs[3] ? inputs[3].value : ''
       });
     }
   });
