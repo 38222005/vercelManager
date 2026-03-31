@@ -127,7 +127,6 @@
         <div style="margin-top:24px;padding-top:24px;border-top:1px solid #e5e5e5;">
           <p style="font-size:14px;color:#666;margin-bottom:8px;font-weight:bold;">温馨提示</p>
           <p style="font-size:12px;color:#999;">• 临时激活码: 13255405952 (24小时)</p>
-          <p style="font-size:12px;color:#999;">• 永久激活码: 15965867361</p>
         </div>
       </div>
     </div>
@@ -229,7 +228,7 @@
   <input type="file" id="import-file" accept=".json" style="display:none;" onchange="importData(this)">
 </div>
 
-<!-- 二手页面 -->
+<!-- 租赁页面 -->
 <div id="page-rental" class="page">
   <div class="rental-header">
     <div class="rental-stats" id="rental-stats"></div>
@@ -301,7 +300,7 @@
   <div id="maintenance-detail-content"></div>
 </div>
 
-<!-- 新车页面 -->
+<!-- 卖车页面 -->
 <div id="page-newvehicle" class="page">
   <div class="rental-header">
     <div class="rental-stats" id="newvehicle-stats"></div>
@@ -326,11 +325,11 @@
   </div>
 </div>
 
-<!-- 新车详情页面 -->
+<!-- 卖车详情页面 -->
 <div id="page-newvehicle-detail" class="page">
   <div class="detail-header">
     <div class="back-btn" onclick="showPage('newvehicle'); initNewVehiclePage();">←</div>
-    <h1 style="font-size:18px;font-weight:bold;color:white;" id="newvehicle-detail-title">新车详情</h1>
+    <h1 style="font-size:18px;font-weight:bold;color:white;" id="newvehicle-detail-title">卖车详情</h1>
   </div>
   
   <div id="newvehicle-detail-content"></div>
@@ -380,14 +379,14 @@ const STORAGE = {
 
 const CODES = { TEMPORARY: '13255405952', PERMANENT: '15965867361' };
 const MODULES = [
-  { key: 'rental', name: '二手、租赁管理', desc: '二手车买卖管理', icon: '📋' },
+  { key: 'rental', name: '租赁管理', desc: '电动车租赁管理', icon: '📋' },
   { key: 'maintenance', name: '维修服务', desc: '预约维修保养', icon: '🔧' },
-  { key: 'newvehicle', name: '新车销售管理', desc: '新车销售管理', icon: '🚗' }
+  { key: 'newvehicle', name: '卖车管理', desc: '卖车管理', icon: '🚗' }
 ];
 
 const PROFIT_CONFIG = {
   rental: { label: '租赁利润', color: '#667eea', profitKey: 'rentalProfit' },
-  newvehicle: { label: '新车利润', color: '#4CAF50', profitKey: 'newVehicleProfit' },
+  newvehicle: { label: '卖车利润', color: '#4CAF50', profitKey: 'newVehicleProfit' },
   maintenance: { label: '维修利润', color: '#FF9800', profitKey: 'maintenanceProfit' },
   other: { label: '其他净收入', color: '#9C27B0', profitKey: 'otherNetIncome', required: true }
 };
