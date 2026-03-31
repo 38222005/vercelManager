@@ -9,7 +9,8 @@
   <meta name="apple-mobile-web-app-title" content="电动车管家">
   <meta name="mobile-web-app-capable" content="yes">
   <link rel="manifest" href="manifest.json">
-  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+  <link rel="apple-touch-icon" href="icons/icon.svg">
+  <link rel="icon" type="image/svg+xml" href="icons/icon.svg">
   <title>电动车管家</title>
   <script src="lib/chart.umd.js"></script>
   <style>
@@ -1683,17 +1684,18 @@ function renderRentalRow(rental, index, isView) {
         <div class="rental-field-label">租金 <span class="required-star">*</span></div>
         <input type="number" value="${rental.rent || ''}" data-field="rent" data-index="${index}" ${isView ? 'disabled' : ''}>
       </td>
+      <td></td>
+    </tr>
+    <tr>
+      <td>
+        <div class="rental-field-label">联系方式</div>
+        <input type="text" value="${rental.customerPhone || ''}" data-field="customerPhone" data-index="${index}" ${isView ? 'disabled' : ''}>
+      </td>
       <td>
         <div class="rental-field-label">押金</div>
         <input type="number" value="${rental.deposit || ''}" data-field="deposit" data-index="${index}" ${isView ? 'disabled' : ''}>
       </td>
-    </tr>
-    <tr>
       <td>
-        <div class="rental-field-label">客户联系方式</div>
-        <input type="text" value="${rental.customerPhone || ''}" data-field="customerPhone" data-index="${index}" ${isView ? 'disabled' : ''}>
-      </td>
-      <td colspan="2">
         <div class="rental-field-label">备注</div>
         <input type="text" value="${rental.remark || ''}" data-field="remark" data-index="${index}" ${isView ? 'disabled' : ''}>
       </td>
@@ -1792,9 +1794,9 @@ function saveVehicle(id) {
           startDate: inputs1[0].value,
           endDate: inputs1[1].value,
           rent: parseFloat(inputs1[2].value),
-          deposit: inputs1[3] ? parseFloat(inputs1[3].value) : 0,
           customerPhone: inputs2[0] ? inputs2[0].value : '',
-          remark: inputs2[1] ? inputs2[1].value : ''
+          deposit: inputs2[1] ? parseFloat(inputs2[1].value) : 0,
+          remark: inputs2[2] ? inputs2[2].value : ''
         });
       }
     }
